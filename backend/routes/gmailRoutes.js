@@ -1,0 +1,59 @@
+// Import Express router
+const express = require('express');
+const router = express.Router();
+
+// Import Gmail controller functions
+const {
+  initiateGmailAuth,
+  handleGmailCallback,
+  checkGmailStatus,
+  disconnectGmail
+} = require('../controllers/gmailController');
+
+// Import JWT authentication middleware
+const authMiddleware = require('../middleware/authMiddleware');
+
+/**
+ * GMAIL OAUTH ROUTES
+ * All routes are prefixed with /api/gmail (defined in server.js)
+ */
+
+/**
+ * @route   GET /api/gmail/auth
+ * @desc    Initiate Gmail OAuth flow (get authorization URL)
+ * @access  Protected (requires JWT token)
+ * @header  Authorization: Bearer <token>
+ * @returns Authorization URL to redirect user to Google consent screen
+ */
+router.get('/auth', authMiddleware, initiateGmailAuth);
+
+/**
+ * @route   GET /api/gmail/callback
+ * @desc    Handle OAuth callback from Google
+ * @access  Public (validated via state parameter)
+ * @query   code - Authorization code from Google
+ * @query   state - State parameter containing userId
+ * @returns Success message with user data
+ */
+router.get('/callback', handleGmailCallback);
+
+/**
+ * @route   GET /api/gmail/status
+ * @desc    Check if user has connected Gmail
+ * @access  Protected (requires JWT token)
+ * @header  Authorization: Bearer <token>
+ * @returns Gmail connection status
+ */
+router.get('/status', authMiddleware, checkGmailStatus);
+
+/**
+ * @route   DELETE /api/gmail/disconnect
+ * @desc    Disconnect Gmail from user account
+ * @access  Protected (requires JWT token)
+ * @header  Authorization: Bearer <token>
+ * @returns Success message
+ */
+router.delete('/disconnect', authMiddleware, disconnectGmail);
+
+// Export the router
+module.exports = router;
