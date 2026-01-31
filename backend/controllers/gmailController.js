@@ -1,6 +1,8 @@
 // Import required modules
 const User = require('../models/User');
+const Email = require('../models/Email');
 const { getAuthUrl, getTokensFromCode } = require('../config/googleOAuth');
+const { fetchEmails } = require('../services/gmailService');
 
 /**
  * INITIATE GMAIL OAUTH FLOW
@@ -221,10 +223,152 @@ const disconnectGmail = async (req, res) => {
   }
 };
 
+/**
+ * FETCH AND SAVE EMAILS FROM GMAIL
+ * @route   POST /api/gmail/fetch
+ * @access  Protected (requires JWT token)
+ * @desc    Fetch emails from Gmail and save to database
+ */
+const fetchAndSaveEmails = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Get maxResults from query parameter or default to 20
+    const maxResults = parseInt(req.query.maxResults) || 20;
+
+    // Validate maxResults
+    if (maxResults < 1 || maxResults > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'maxResults must be between 1 and 100'
+      });
+    }
+
+    // Get user from database
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if Gmail is connected
+    if (!user.gmailAccessToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gmail not connected. Please connect Gmail first.',
+        action: 'Call GET /api/gmail/auth to connect Gmail'
+      });
+    }
+
+    console.log(`\n📧 Starting email fetch for user: ${user.email}`);
+    console.log(`   Fetching up to ${maxResults} emails...\n`);
+
+    // Fetch emails from Gmail using service
+    const fetchedEmails = await fetchEmails(user, maxResults);
+
+    if (fetchedEmails.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No emails found in Gmail inbox',
+        data: {
+          fetched: 0,
+          saved: 0,
+          duplicates: 0,
+          errors: 0
+        }
+      });
+    }
+
+    // Statistics tracking
+    let savedCount = 0;
+    let duplicateCount = 0;
+    let errorCount = 0;
+
+    // Process and save each email
+    console.log(`\n💾 Saving emails to database...\n`);
+
+    for (const fetchedEmail of fetchedEmails) {
+      try {
+        // Prepare email document
+        const emailDoc = {
+          userId: user._id,
+          gmailId: fetchedEmail.gmailId,
+          sender: fetchedEmail.sender,
+          subject: fetchedEmail.subject,
+          body: fetchedEmail.body,
+          htmlBody: fetchedEmail.htmlBody,
+          receivedAt: fetchedEmail.receivedAt,
+          fetchedAt: new Date(),
+          metadata: fetchedEmail.metadata
+        };
+
+        // Try to save email (will fail if duplicate gmailId exists)
+        const email = new Email(emailDoc);
+        await email.save();
+
+        savedCount++;
+        console.log(`   ✅ Saved: "${fetchedEmail.subject.substring(0, 50)}..."`);
+
+      } catch (error) {
+        // Check if it's a duplicate key error
+        if (error.code === 11000) {
+          duplicateCount++;
+          console.log(`   ⏭️  Duplicate: "${fetchedEmail.subject.substring(0, 50)}..."`);
+        } else {
+          errorCount++;
+          console.error(`   ❌ Error saving: ${error.message}`);
+        }
+      }
+    }
+
+    console.log(`\n📊 Fetch Summary:`);
+    console.log(`   Total fetched: ${fetchedEmails.length}`);
+    console.log(`   Saved: ${savedCount}`);
+    console.log(`   Duplicates: ${duplicateCount}`);
+    console.log(`   Errors: ${errorCount}\n`);
+
+    // Return success response
+    res.status(200).json({
+      success: true,
+      message: 'Emails fetched and saved successfully',
+      data: {
+        fetched: fetchedEmails.length,
+        saved: savedCount,
+        duplicates: duplicateCount,
+        errors: errorCount,
+        totalInDatabase: await Email.countDocuments({ userId: user._id })
+      }
+    });
+
+  } catch (error) {
+    console.error('Fetch and save error:', error);
+    
+    // Provide helpful error messages
+    if (error.message.includes('Token may be expired')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Gmail token expired. Please reconnect Gmail.',
+        action: 'Call DELETE /api/gmail/disconnect then GET /api/gmail/auth'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch and save emails',
+      error: error.message
+    });
+  }
+};
+
 // Export controller functions
 module.exports = {
   initiateGmailAuth,
   handleGmailCallback,
   checkGmailStatus,
-  disconnectGmail
+  disconnectGmail,
+  fetchAndSaveEmails
+
 };

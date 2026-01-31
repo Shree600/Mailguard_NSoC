@@ -7,7 +7,8 @@ const {
   initiateGmailAuth,
   handleGmailCallback,
   checkGmailStatus,
-  disconnectGmail
+  disconnectGmail,
+  fetchAndSaveEmails
 } = require('../controllers/gmailController');
 
 // Import JWT authentication middleware
@@ -54,6 +55,14 @@ router.get('/status', authMiddleware, checkGmailStatus);
  * @returns Success message
  */
 router.delete('/disconnect', authMiddleware, disconnectGmail);
-
+/**
+ * @route   POST /api/gmail/fetch
+ * @desc    Fetch emails from Gmail and save to database
+ * @access  Protected (requires JWT token)
+ * @header  Authorization: Bearer <token>
+ * @query   maxResults - Number of emails to fetch (default: 20, max: 100)
+ * @returns Statistics about fetched and saved emails
+ */
+router.post('/fetch', authMiddleware, fetchAndSaveEmails);
 // Export the router
 module.exports = router;
