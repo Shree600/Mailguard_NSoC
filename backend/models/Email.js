@@ -1,0 +1,189 @@
+// Import mongoose for schema creation
+const mongoose = require('mongoose');
+
+/**
+ * Email Schema Definition
+ * Stores emails fetched from Gmail for phishing analysis
+ */
+const emailSchema = new mongoose.Schema(
+  {
+    // Reference to the user who owns this email
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User', // References the User model
+      required: [true, 'User ID is required'],
+      index: true, // Index for faster queries by user
+    },
+
+    // Unique Gmail message ID
+    gmailId: {
+      type: String,
+      required: [true, 'Gmail ID is required'],
+      unique: true, // Prevents duplicate emails
+      index: true, // Index for faster lookups
+    },
+
+    // Email sender (from address)
+    sender: {
+      type: String,
+      required: [true, 'Sender is required'],
+      trim: true,
+      lowercase: true,
+    },
+
+    // Email subject line
+    subject: {
+      type: String,
+      required: [true, 'Subject is required'],
+      trim: true,
+      default: '(No Subject)',
+    },
+
+    // Email body content (plain text)
+    body: {
+      type: String,
+      required: [true, 'Body is required'],
+      default: '',
+    },
+
+    // Original HTML body (if available)
+    htmlBody: {
+      type: String,
+      default: null,
+    },
+
+    // Timestamp when email was received in Gmail
+    receivedAt: {
+      type: Date,
+      required: [true, 'Received date is required'],
+      index: true, // Index for sorting by date
+    },
+
+    // Timestamp when email was fetched/imported into our system
+    fetchedAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    // Phishing classification (will be used in Phase 3 with ML)
+    classification: {
+      type: String,
+      enum: ['pending', 'legitimate', 'phishing', 'suspicious'],
+      default: 'pending',
+    },
+
+    // Confidence score from ML model (0-100)
+    confidenceScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: null,
+    },
+
+    // Whether email has been analyzed
+    isAnalyzed: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Additional metadata
+    metadata: {
+      threadId: String, // Gmail thread ID
+      labelIds: [String], // Gmail labels
+      snippet: String, // Email preview snippet
+      hasAttachments: { type: Boolean, default: false },
+    },
+  },
+  {
+    // Automatically add createdAt and updatedAt timestamps
+    timestamps: true,
+  }
+);
+
+/**
+ * INDEXES
+ * Compound indexes for common query patterns
+ */
+
+// Index for getting user's emails sorted by date
+emailSchema.index({ userId: 1, receivedAt: -1 });
+
+// Index for finding unanalyzed emails
+emailSchema.index({ isAnalyzed: 1, userId: 1 });
+
+// Index for classification queries
+emailSchema.index({ userId: 1, classification: 1 });
+
+/**
+ * INSTANCE METHODS
+ */
+
+// Method to mark email as analyzed
+emailSchema.methods.markAsAnalyzed = function(classification, confidenceScore) {
+  this.isAnalyzed = true;
+  this.classification = classification;
+  this.confidenceScore = confidenceScore;
+  return this.save();
+};
+
+/**
+ * STATIC METHODS
+ */
+
+// Get all emails for a user
+emailSchema.statics.findByUserId = function(userId, limit = 50) {
+  return this.find({ userId })
+    .sort({ receivedAt: -1 })
+    .limit(limit)
+    .select('-htmlBody'); // Exclude HTML body for performance
+};
+
+// Get unanalyzed emails for a user
+emailSchema.statics.findUnanalyzed = function(userId) {
+  return this.find({ userId, isAnalyzed: false })
+    .sort({ receivedAt: -1 })
+    .select('-htmlBody');
+};
+
+// Get phishing emails for a user
+emailSchema.statics.findPhishing = function(userId) {
+  return this.find({ userId, classification: 'phishing' })
+    .sort({ receivedAt: -1 })
+    .select('-htmlBody -body');
+};
+
+// Count emails by classification
+emailSchema.statics.getStatsByUserId = async function(userId) {
+  const stats = await this.aggregate([
+    { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+    { 
+      $group: {
+        _id: '$classification',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // Format results
+  const result = {
+    total: 0,
+    pending: 0,
+    legitimate: 0,
+    phishing: 0,
+    suspicious: 0
+  };
+
+  stats.forEach(stat => {
+    result[stat._id] = stat.count;
+    result.total += stat.count;
+  });
+
+  return result;
+};
+
+/**
+ * Create and export Email model
+ */
+const Email = mongoose.model('Email', emailSchema);
+
+module.exports = Email;
