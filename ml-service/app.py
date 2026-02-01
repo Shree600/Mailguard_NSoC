@@ -44,7 +44,28 @@ class PredictionResponse(BaseModel):
 
 # Health check endpoint
 @app.get("/health")
-async
+async def health_check():
+    """
+    Health check endpoint to verify service is running
+    Returns: Status message
+    """
+    return {"status": "ok"}
+
+
+# Root endpoint
+@app.get("/")
+async def root():
+    """
+    Root endpoint with service information
+    Returns: Service name and version
+    """
+    model_status = predictor.get_model_status()
+    return {
+        "service": "Phishing Detection ML Service",
+        "version": "1.0.0",
+        "status": "running",
+        "model_loaded": model_status["loaded"]
+    }
 
 
 # Prediction endpoint
@@ -72,24 +93,4 @@ async def predict(request: PredictionRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) def health_check():
-    """
-    Health check endpoint to verify service is running
-    Returns: Status message
-    """
-    return {"status": "ok"}
-
-# Root endpoint
-@app.get("/")
-async def root():
-    """
-    Root endpoint with service information
-    Returns: Service name and version
-    """
-    model_status = predictor.get_model_status()
-    return {
-        "service": "Phishing Detection ML Service",
-        "version": "1.0.0",
-        "status": "running",
-        "model_loaded": model_status["loaded"]
-    }
+        raise HTTPException(status_code=500, detail=str(e))
