@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const { startScheduler } = require('./jobs/retrainJob');
+const { startScanJob } = require('./jobs/scanJob');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -74,4 +75,9 @@ app.listen(PORT, () => {
   // Runs model retraining based on schedule (default: 2 AM daily)
   // Set RETRAIN_SCHEDULE env variable to customize (e.g., '*/1 * * * *' for testing)
   startScheduler();
+  
+  // Initialize nightly email scan and cleanup job
+  // Automatically fetches, classifies, and deletes phishing emails
+  // Runs every night at 2 AM
+  startScanJob();
 });
