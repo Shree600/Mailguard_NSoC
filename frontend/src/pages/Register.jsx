@@ -4,15 +4,19 @@
  */
 
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { register } from '../services/api'
 
 function Register() {
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleChange = (e) => {
     setFormData({
@@ -21,17 +25,40 @@ function Register() {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
     
     // Basic validation
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!')
+      setError('Passwords do not match!')
       return
     }
 
-    console.log('Registration attempt:', formData)
-    // Will connect to backend API in next steps
+    setLoading(true)
+
+    try {
+      // Call register API
+      const response = await register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
+      })
+      
+      // Store token in localStorage
+      if (response.token) {
+        localStorage.setItem('token', response.token)
+        console.log('✅ Registration successful, token saved')
+        
+        // Navigate to dashboard
+        navigate('/dashboard')
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed. Please try again.')
+      console.error('Registration error:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -143,10 +170,18 @@ function Register() {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+            disabled={loading}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Create Account
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
         </form>
 
         {/* Divider */}
