@@ -1,0 +1,19 @@
+text,label
+"Congratulations! You've won $1,000,000! Click here to claim your prize now!",phishing
+"URGENT: Your account has been compromised. Verify your identity immediately.",phishing
+"Your password will expire in 24 hours. Update now to avoid account suspension.",phishing
+"You have inherited $5 million from a distant relative. Reply to claim funds.",phishing
+"Final notice: Your package is being returned. Click to reschedule delivery.",phishing
+"Your tax refund of $2,450 is ready. Click here to receive your money.",phishing
+"Meeting scheduled for tomorrow at 2pm in Conference Room B.",legitimate
+"Please review the attached quarterly report and provide feedback by Friday.",legitimate
+"Reminder: Team lunch this Thursday at noon. Please confirm attendance.",legitimate
+"Your monthly statement is now available. Log in to view your account.",legitimate
+"Thank you for your purchase. Your order #12345 will ship within 2 business days.",legitimate
+"Welcome to our newsletter! Here are this week's top articles.",legitimate
+"Free iPhone! Click now to claim your prize! Limited time offer!",phishing
+"Your credit card has been blocked. Call this number immediately to unlock.",phishing
+"Verify your email address to activate your account within 24 hours.",phishing
+"Project update: Phase 1 completed successfully. Next milestone is due next week.",legitimate
+"Invitation: Annual company gathering on December 15th.",legitimate
+"Your subscription has been confirmed. Thank you for joining us.",legitimate
