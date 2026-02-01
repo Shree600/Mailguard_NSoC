@@ -4,10 +4,17 @@
  */
 
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 function Dashboard() {
-  const [user] = useState({ name: 'User', email: 'user@example.com' })
+  const { user, logout } = useAuth()
+  const displayName = user?.name || user?.email || 'User'
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      logout()
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -27,13 +34,13 @@ function Dashboard() {
 
             {/* User Menu */}
             <div className="flex items-center space-x-4">
-              <span className="text-gray-700 font-medium">{user.name}</span>
-              <Link
-                to="/login"
+              <span className="text-gray-700 font-medium">{displayName}</span>
+              <button
+                onClick={handleLogout}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition duration-200"
               >
                 Logout
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -44,7 +51,7 @@ function Dashboard() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Welcome back, {user.name}! 👋
+            Welcome back, {displayName}! 👋
           </h1>
           <p className="text-gray-600">
             Here's your email security overview

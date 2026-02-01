@@ -4,11 +4,12 @@
  */
 
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { register } from '../services/api'
+import { Link } from 'react-router-dom'
+import { register as registerAPI } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 function Register() {
-  const navigate = useNavigate()
+  const { login } = useAuth()
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -39,19 +40,15 @@ function Register() {
 
     try {
       // Call register API
-      const response = await register({
+      const response = await registerAPI({
         name: formData.name,
         email: formData.email,
         password: formData.password
       })
       
-      // Store token in localStorage
+      // Use AuthContext login to store token and user
       if (response.token) {
-        localStorage.setItem('token', response.token)
-        console.log('✅ Registration successful, token saved')
-        
-        // Navigate to dashboard
-        navigate('/dashboard')
+        login(response.token, response.user || { email: formData.email, name: formData.name })
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.')

@@ -4,11 +4,12 @@
  */
 
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { login } from '../services/api'
+import { Link } from 'react-router-dom'
+import { login as loginAPI } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 function Login() {
-  const navigate = useNavigate()
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,15 +22,11 @@ function Login() {
 
     try {
       // Call login API
-      const response = await login({ email, password })
+      const response = await loginAPI({ email, password })
       
-      // Store token in localStorage
+      // Use AuthContext login to store token and user
       if (response.token) {
-        localStorage.setItem('token', response.token)
-        console.log('✅ Token saved:', response.token)
-        
-        // Navigate to dashboard
-        navigate('/dashboard')
+        login(response.token, response.user || { email })
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.')
