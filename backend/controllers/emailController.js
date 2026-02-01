@@ -4,6 +4,8 @@
 const Email = require('../models/Email');
 const Classification = require('../models/Classification');
 const mlService = require('../services/mlService');
+const { deleteEmail: deleteGmailEmail } = require('../services/gmailService');
+const User = require('../models/User');
 
 /**
  * Classify all unclassified emails using ML service
@@ -171,6 +173,82 @@ exports.getClassifiedEmails = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Get classified emails error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Delete a single email from Gmail and Database
+ * DELETE /api/emails/:id
+ */
+exports.deleteEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id; // From auth middleware
+
+    console.log(`🗑️  Delete request for email ID: ${id} by user: ${userId}`);
+
+    // Step 1: Find the email in database
+    const email = await Email.findOne({ _id: id, userId: userId });
+
+    if (!email) {
+      return res.status(404).json({
+        success: false,
+        error: 'Email not found or you do not have permission to delete it'
+      });
+    }
+
+    console.log(`📧 Found email: ${email.subject} (Gmail ID: ${email.gmailId})`);
+
+    // Step 2: Get user's Gmail tokens
+    const user = await User.findById(userId);
+
+    if (!user || !user.gmailAccessToken) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gmail not connected. Cannot delete email from Gmail.'
+      });
+    }
+
+    // Step 3: Delete from Gmail using Gmail API
+    try {
+      await deleteGmailEmail(
+        email.gmailId,
+        user.gmailAccessToken,
+        user.gmailRefreshToken
+      );
+      console.log(`✅ Email deleted from Gmail: ${email.gmailId}`);
+    } catch (gmailError) {
+      console.error(`⚠️  Gmail deletion failed: ${gmailError.message}`);
+      // Continue to delete from DB even if Gmail deletion fails
+      // (email might already be deleted from Gmail)
+    }
+
+    // Step 4: Delete associated classification
+    await Classification.deleteOne({ emailId: email._id });
+    console.log(`✅ Classification deleted for email: ${email._id}`);
+
+    // Step 5: Delete email from database
+    await Email.deleteOne({ _id: email._id });
+    console.log(`✅ Email deleted from database: ${email._id}`);
+
+    // Step 6: Return success response
+    res.json({
+      success: true,
+      message: 'Email deleted successfully',
+      deletedEmail: {
+        id: email._id,
+        subject: email.subject,
+        sender: email.sender,
+        gmailId: email.gmailId
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Delete email error:', error);
     res.status(500).json({
       success: false,
       error: error.message

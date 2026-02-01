@@ -18,4 +18,7 @@ router.get('/stats', emailController.getClassificationStats);
 // Get classified emails
 router.get('/classified', emailController.getClassifiedEmails);
 
+// Delete a single email
+router.delete('/:id', emailController.deleteEmail);
+
 module.exports = router;
