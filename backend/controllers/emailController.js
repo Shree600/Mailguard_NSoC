@@ -255,3 +255,120 @@ exports.deleteEmail = async (req, res) => {
     });
   }
 };
+
+/**
+ * Bulk delete multiple emails from Gmail and Database
+ * POST /api/emails/bulk-delete
+ * Body: { emailIds: [id1, id2, id3] }
+ */
+exports.bulkDeleteEmails = async (req, res) => {
+  try {
+    const { emailIds } = req.body;
+    const userId = req.user.id; // From auth middleware
+
+    console.log(`🗑️  Bulk delete request for ${emailIds?.length || 0} emails by user: ${userId}`);
+
+    // Step 1: Validate input
+    if (!emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'emailIds array is required and must not be empty'
+      });
+    }
+
+    // Limit bulk delete to prevent abuse
+    if (emailIds.length > 100) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot delete more than 100 emails at once'
+      });
+    }
+
+    // Step 2: Find all emails belonging to the user
+    const emails = await Email.find({
+      _id: { $in: emailIds },
+      userId: userId // Security: only delete user's own emails
+    });
+
+    if (emails.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No emails found or you do not have permission to delete them'
+      });
+    }
+
+    console.log(`📧 Found ${emails.length} emails to delete`);
+
+    // Step 3: Get user's Gmail tokens
+    const user = await User.findById(userId);
+
+    if (!user || !user.gmailAccessToken) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gmail not connected. Cannot delete emails from Gmail.'
+      });
+    }
+
+    // Step 4: Delete each email from Gmail and database
+    const results = {
+      total: emails.length,
+      successful: 0,
+      failed: 0,
+      gmailErrors: 0,
+      deletedEmails: []
+    };
+
+    for (const email of emails) {
+      try {
+        // Delete from Gmail
+        try {
+          await deleteGmailEmail(
+            email.gmailId,
+            user.gmailAccessToken,
+            user.gmailRefreshToken
+          );
+          console.log(`✅ Gmail deleted: ${email.gmailId}`);
+        } catch (gmailError) {
+          console.error(`⚠️  Gmail deletion failed for ${email.gmailId}: ${gmailError.message}`);
+          results.gmailErrors++;
+          // Continue to delete from DB even if Gmail deletion fails
+        }
+
+        // Delete classification
+        await Classification.deleteOne({ emailId: email._id });
+
+        // Delete from database
+        await Email.deleteOne({ _id: email._id });
+
+        results.successful++;
+        results.deletedEmails.push({
+          id: email._id,
+          subject: email.subject,
+          sender: email.sender
+        });
+
+        console.log(`✅ Deleted: ${email.subject}`);
+
+      } catch (error) {
+        console.error(`❌ Failed to delete email ${email._id}:`, error.message);
+        results.failed++;
+      }
+    }
+
+    console.log(`✅ Bulk delete complete: ${results.successful} successful, ${results.failed} failed`);
+
+    // Step 5: Return results
+    res.json({
+      success: true,
+      message: `Successfully deleted ${results.successful} out of ${results.total} emails`,
+      results: results
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete emails error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};

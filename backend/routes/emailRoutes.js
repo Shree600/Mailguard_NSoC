@@ -21,4 +21,7 @@ router.get('/classified', emailController.getClassifiedEmails);
 // Delete a single email
 router.delete('/:id', emailController.deleteEmail);
 
+// Bulk delete multiple emails
+router.post('/bulk-delete', emailController.bulkDeleteEmails);
+
 module.exports = router;
