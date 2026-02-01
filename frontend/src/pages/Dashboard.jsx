@@ -22,6 +22,12 @@ function Dashboard() {
   })
   const [statsLoading, setStatsLoading] = useState(true)
   const [error, setError] = useState('')
+  
+  // Storage stats state
+  const [storageSaved, setStorageSaved] = useState({
+    emailsDeleted: 0,
+    mbSaved: 0
+  })
 
   // Emails state
   const [emails, setEmails] = useState([])
@@ -166,6 +172,12 @@ function Dashboard() {
       const result = await bulkDeleteEmails(selectedEmails)
       console.log('✅ Bulk delete result:', result)
       
+      // Update storage saved stats
+      setStorageSaved(prev => ({
+        emailsDeleted: prev.emailsDeleted + result.results.successful,
+        mbSaved: prev.mbSaved + (result.results.successful * 0.05) // Estimate 50KB per email
+      }))
+      
       // Clear selection
       setSelectedEmails([])
       
@@ -190,6 +202,14 @@ function Dashboard() {
     try {
       const result = await cleanPhishingEmails()
       console.log('✅ Clean phishing result:', result)
+      
+      // Update storage saved stats
+      if (result.results.deleted > 0) {
+        setStorageSaved(prev => ({
+          emailsDeleted: prev.emailsDeleted + result.results.deleted,
+          mbSaved: prev.mbSaved + parseFloat(result.results.storageSaved.mb)
+        }))
+      }
       
       // Clear selection
       setSelectedEmails([])
@@ -252,7 +272,7 @@ function Dashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {/* Total Emails Card */}
           <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-6 hover:border-gray-700 transition duration-200">
             <div className="flex items-center justify-between mb-4">
@@ -318,6 +338,22 @@ function Dashboard() {
               </>
             )}
           </div>
+          
+          {/* Storage Saved Card */}
+          <div className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 backdrop-blur-sm rounded-xl border border-purple-500/30 p-6 hover:border-purple-500/50 transition duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-purple-600/30 rounded-lg border border-purple-400/40">
+                <svg className="w-6 h-6 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-purple-300 mb-1">{storageSaved.mbSaved.toFixed(2)} MB</h3>
+            <p className="text-gray-300 text-sm">Storage Saved</p>
+            <p className="text-xs text-purple-400 mt-2">
+              🗑️ {storageSaved.emailsDeleted} emails cleaned
+            </p>
+          </div>
         </div>
 
         {/* Error Message */}
@@ -374,7 +410,7 @@ function Dashboard() {
         {/* Footer Note */}
         <div className="mt-8 text-center">
           <p className="text-sm text-gray-500">
-            🤖 Powered by AI • Phase 5 - Frontend Dashboard
+            🤖 Powered by AI • Phase 6 - Gmail Actions & Automation Complete
           </p>
         </div>
       </div>
