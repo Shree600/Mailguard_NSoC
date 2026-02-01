@@ -3,12 +3,50 @@
  * Main dashboard view after login
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { getEmailStats } from '../services/api'
 
 function Dashboard() {
   const { user, logout } = useAuth()
   const displayName = user?.name || user?.email || 'User'
+  
+  // Stats state
+  const [stats, setStats] = useState({
+    total: 0,
+    phishing: 0,
+    safe: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Fetch stats on component mount
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const response = await getEmailStats()
+      
+      // Update stats from API response
+      setStats({
+        total: response.total || 0,
+        phishing: response.phishing || 0,
+        safe: response.safe || response.legitimate || 0
+      })
+      
+      console.log('✅ Stats loaded:', response)
+    } catch (err) {
+      console.error('❌ Failed to load stats:', err)
+      setError('Failed to load statistics')
+      // Keep default values on error
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -69,8 +107,17 @@ function Dashboard() {
                 </svg>
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-1">0</h3>
-            <p className="text-gray-600 text-sm">Total Emails</p>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-2xl font-bold text-gray-800 mb-1">{stats.total}</h3>
+                <p className="text-gray-600 text-sm">Total Emails</p>
+              </>
+            )}
           </div>
 
           {/* Phishing Detected Card */}
@@ -82,8 +129,17 @@ function Dashboard() {
                 </svg>
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-1">0</h3>
-            <p className="text-gray-600 text-sm">Phishing Detected</p>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-2xl font-bold text-gray-800 mb-1">{stats.phishing}</h3>
+                <p className="text-gray-600 text-sm">Phishing Detected</p>
+              </>
+            )}
           </div>
 
           {/* Safe Emails Card */}
@@ -95,10 +151,26 @@ function Dashboard() {
                 </svg>
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-1">0</h3>
-            <p className="text-gray-600 text-sm">Safe Emails</p>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-2xl font-bold text-gray-800 mb-1">{stats.safe}</h3>
+                <p className="text-gray-600 text-sm">Safe Emails</p>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Empty State */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
