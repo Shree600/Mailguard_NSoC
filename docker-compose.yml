@@ -1,0 +1,133 @@
+# ================================================
+# MAILGUARD - DOCKER COMPOSE CONFIGURATION
+# ================================================
+# Full stack deployment with:
+# - MongoDB database
+# - Node.js backend API
+# - FastAPI ML service
+# - React frontend (nginx)
+#
+# Usage:
+#   docker compose up --build    # Build and start all services
+#   docker compose down          # Stop and remove containers
+#   docker compose logs -f       # View logs from all services
+# ================================================
+
+services:
+  # ================================================
+  # MONGODB DATABASE
+  # ================================================
+  mongo:
+    image: mongo:7-jammy
+    container_name: mailguard-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: mailguard
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    networks:
+      - mailguard-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ================================================
+  # ML SERVICE (FASTAPI)
+  # ================================================
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: mailguard-ml
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    networks:
+      - mailguard-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ================================================
+  # BACKEND API (NODE.JS + EXPRESS)
+  # ================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mailguard-backend
+    restart: unless-stopped
+    environment:
+      - PORT=5000
+      - MONGO_URI=mongodb://mongo:27017/mailguard
+      - ML_SERVICE_URL=http://ml-service:8000
+      - BACKEND_URL=http://backend:5000
+      - JWT_SECRET=${JWT_SECRET:-default_jwt_secret_change_in_production}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:5000/api/gmail/callback}
+      - RETRAIN_SCHEDULE=${RETRAIN_SCHEDULE:-0 2 * * *}
+      - NODE_ENV=production
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
+    networks:
+      - mailguard-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ================================================
+  # FRONTEND (REACT + NGINX)
+  # ================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mailguard-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - mailguard-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# ================================================
+# NETWORKS
+# ================================================
+networks:
+  mailguard-network:
+    driver: bridge
+    name: mailguard-network
+
+# ================================================
+# VOLUMES
+# ================================================
+volumes:
+  mongo-data:
+    name: mailguard-mongo-data
+  mongo-config:
+    name: mailguard-mongo-config

@@ -52,7 +52,7 @@ README.md
 Dockerfile
 .dockerignore
 docker-compose.yml
-nginx.conf
+# nginx.conf is needed for build, do not exclude
 
 # Temporary files
 *.tmp
