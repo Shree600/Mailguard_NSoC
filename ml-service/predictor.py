@@ -71,18 +71,101 @@ def load_models():
         raise
 
 
+def reload_model():
+    """
+    Reload the models from disk without restarting the service.
+    This allows hot-reloading after model retraining.
+    
+    Returns:
+        dict: Status information about the reload
+    """
+    global vectorizer, model, model_loaded
+    
+    try:
+        print("\n" + "="*50)
+        print("🔄 Reloading models from disk...")
+        print("="*50)
+        
+        # Check if model files exist
+        if not os.path.exists(VECTORIZER_PATH):
+            error_msg = f"Vectorizer file not found: {VECTORIZER_PATH}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
+        
+        if not os.path.exists(MODEL_PATH):
+            error_msg = f"Model file not found: {MODEL_PATH}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
+        
+        # Get file modification times for tracking
+        vectorizer_mtime = os.path.getmtime(VECTORIZER_PATH)
+        model_mtime = os.path.getmtime(MODEL_PATH)
+        
+        print(f"📦 Loading vectorizer from: {VECTORIZER_PATH}")
+        new_vectorizer = joblib.load(VECTORIZER_PATH)
+        print("✅ Vectorizer loaded")
+        
+        print(f"📦 Loading model from: {MODEL_PATH}")
+        new_model = joblib.load(MODEL_PATH)
+        print("✅ Model loaded")
+        
+        # Update global variables (atomic update)
+        vectorizer = new_vectorizer
+        model = new_model
+        model_loaded = True
+        
+        print("✅ Models reloaded successfully!")
+        print("="*50 + "\n")
+        
+        return {
+            "success": True,
+            "message": "Models reloaded successfully",
+            "loaded": True,
+            "vectorizer_updated": True,
+            "model_updated": True,
+            "vectorizer_mtime": vectorizer_mtime,
+            "model_mtime": model_mtime
+        }
+        
+    except Exception as e:
+        error_msg = f"Error reloading models: {str(e)}"
+        print(f"❌ {error_msg}")
+        print("="*50 + "\n")
+        return {
+            "success": False,
+            "error": error_msg,
+            "loaded": model_loaded
+        }
+
+
 def get_model_status():
     """
     Get the current model loading status.
     Returns: Dictionary with status information
     """
-    return {
+    status = {
         "loaded": model_loaded,
         "vectorizer_exists": os.path.exists(VECTORIZER_PATH),
         "model_exists": os.path.exists(MODEL_PATH),
         "vectorizer_path": VECTORIZER_PATH,
         "model_path": MODEL_PATH
     }
+    
+    # Add file modification times if files exist
+    if status["vectorizer_exists"]:
+        status["vectorizer_mtime"] = os.path.getmtime(VECTORIZER_PATH)
+    if status["model_exists"]:
+        status["model_mtime"] = os.path.getmtime(MODEL_PATH)
+    
+    return status
 
 
 def predict_email(text):

@@ -94,3 +94,62 @@ async def predict(request: PredictionRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Model reload endpoint
+@app.post("/reload")
+async def reload_models():
+    """
+    Reload the ML models from disk without restarting the service.
+    This endpoint should be called after retraining the model.
+    
+    Returns:
+        Status information about the reload operation
+    """
+    try:
+        # Reload models
+        result = predictor.reload_model()
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "message": result["message"],
+                "status": "Models reloaded successfully",
+                "model_loaded": result["loaded"],
+                "timestamp": result.get("model_mtime", None)
+            }
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail=result.get("error", "Failed to reload models")
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reload error: {str(e)}")
+
+
+# Model status endpoint
+@app.get("/model/status")
+async def get_model_status():
+    """
+    Get current model loading status and file information.
+    
+    Returns:
+        Model status information including file paths and modification times
+    """
+    try:
+        status = predictor.get_model_status()
+        return {
+            "success": True,
+            "model_loaded": status["loaded"],
+            "vectorizer_exists": status["vectorizer_exists"],
+            "model_exists": status["model_exists"],
+            "vectorizer_path": status["vectorizer_path"],
+            "model_path": status["model_path"],
+            "vectorizer_mtime": status.get("vectorizer_mtime"),
+            "model_mtime": status.get("model_mtime")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Status error: {str(e)}")
