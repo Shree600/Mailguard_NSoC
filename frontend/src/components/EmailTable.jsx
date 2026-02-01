@@ -9,14 +9,14 @@ function EmailTable({ emails, onDelete, onFeedback, loading }) {
   // Show loading state
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+      <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-8">
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex items-center space-x-4">
-              <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/6"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+              <div className="h-4 bg-gray-800 rounded w-1/4"></div>
+              <div className="h-4 bg-gray-800 rounded w-1/3"></div>
+              <div className="h-4 bg-gray-800 rounded w-1/6"></div>
+              <div className="h-4 bg-gray-800 rounded w-1/6"></div>
             </div>
           ))}
         </div>
@@ -27,18 +27,18 @@ function EmailTable({ emails, onDelete, onFeedback, loading }) {
   // Show empty state
   if (!emails || emails.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
+      <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-12">
         <div className="text-center">
-          <div className="inline-block p-4 bg-gray-100 rounded-full mb-4">
-            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-block p-4 bg-gray-800 rounded-full mb-4">
+            <svg className="w-12 h-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">No emails yet</h3>
-          <p className="text-gray-600 mb-6">
+          <h3 className="text-xl font-semibold text-white mb-2">No emails yet</h3>
+          <p className="text-gray-400 mb-6">
             Connect your email account to start detecting phishing emails
           </p>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition duration-200">
+          <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold px-6 py-3 rounded-lg transition duration-200 shadow-lg shadow-blue-900/50">
             Connect Email Account
           </button>
         </div>
@@ -48,35 +48,35 @@ function EmailTable({ emails, onDelete, onFeedback, loading }) {
 
   // Render email table
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 overflow-hidden">
       {/* Table Header */}
-      <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-800">Email List</h2>
+      <div className="bg-gray-800/50 border-b border-gray-700 px-6 py-4">
+        <h2 className="text-lg font-semibold text-white">Email List</h2>
       </div>
 
       {/* Table Content */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-gray-800/30 border-b border-gray-700">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Subject
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 From
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Prediction
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Confidence
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-800">
             {emails.map((email) => (
               <EmailRow
                 key={email._id}
@@ -140,14 +140,14 @@ function EmailRow({ email, onDelete, onFeedback }) {
   }
 
   return (
-    <tr className="hover:bg-gray-50 transition duration-150">
+    <tr className="hover:bg-gray-800/30 transition duration-150">
       <td className="px-6 py-4">
-        <div className="text-sm font-medium text-gray-900">
+        <div className="text-sm font-medium text-white">
           {truncate(email.subject)}
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-400">
           {truncate(email.sender || email.from, 30)}
         </div>
       </td>
@@ -155,7 +155,7 @@ function EmailRow({ email, onDelete, onFeedback }) {
         {getPredictionBadge()}
       </td>
       <td className="px-6 py-4">
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-300">
           {getConfidence()}
         </div>
       </td>
