@@ -85,6 +85,56 @@ def get_model_status():
     }
 
 
+def predict_email(text):
+    """
+    Predict if an email is phishing or safe.
+    
+    Args:
+        text (str): Email body text to analyze
+        
+    Returns:
+        dict: Prediction result with label and confidence
+            {
+                "prediction": "phishing" | "safe",
+                "confidence": float (0-1),
+                "probabilities": {
+                    "safe": float,
+                    "phishing": float
+                }
+            }
+    """
+    global vectorizer, model, model_loaded
+    
+    # Check if models are loaded
+    if not model_loaded or vectorizer is None or model is None:
+        raise Exception("Models not loaded. Please restart the service.")
+    
+    try:
+        # Preprocess and vectorize the text
+        text_vectorized = vectorizer.transform([text])
+        
+        # Get prediction (0 = safe, 1 = phishing)
+        prediction = model.predict(text_vectorized)[0]
+        
+        # Get probability scores for both classes
+        probabilities = model.predict_proba(text_vectorized)[0]
+        
+        # Format result
+        result = {
+            "prediction": "phishing" if prediction == 1 else "safe",
+            "confidence": float(max(probabilities)),  # Confidence in the prediction
+            "probabilities": {
+                "safe": float(probabilities[0]),
+                "phishing": float(probabilities[1])
+            }
+        }
+        
+        return result
+        
+    except Exception as e:
+        raise Exception(f"Prediction error: {str(e)}")
+
+
 # Load models when module is imported
 print("\n" + "="*50)
 print("🚀 Initializing ML Service")
