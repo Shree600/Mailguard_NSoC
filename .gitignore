@@ -33,3 +33,9 @@ __pycache__/
 .Python
 env/
 venv/
+
+# ML Training Files
+ml-service/training.csv
+ml-service/training_*.csv
+ml-service/phishing_model.pkl
+ml-service/vectorizer.pkl
