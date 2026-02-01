@@ -168,6 +168,35 @@ export const deleteEmail = async (emailId) => {
   }
 }
 
+/**
+ * Bulk delete multiple emails
+ * @param {Array<string>} emailIds - Array of email IDs to delete
+ * @returns {Promise} Results object with deletion stats
+ */
+export const bulkDeleteEmails = async (emailIds) => {
+  try {
+    const response = await api.post('/emails/bulk-delete', { emailIds })
+    return response.data
+  } catch (error) {
+    console.error('❌ Failed to bulk delete emails:', error)
+    throw error
+  }
+}
+
+/**
+ * Clean all phishing emails
+ * @returns {Promise} Results object with deletion stats
+ */
+export const cleanPhishingEmails = async () => {
+  try {
+    const response = await api.post('/emails/clean-phishing')
+    return response.data
+  } catch (error) {
+    console.error('❌ Failed to clean phishing emails:', error)
+    throw error
+  }
+}
+
 // ================================
 // FEEDBACK ENDPOINTS
 // ================================

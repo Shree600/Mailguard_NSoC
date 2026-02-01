@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { getEmailStats, getEmails, deleteEmail, submitFeedback } from '../services/api'
+import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback } from '../services/api'
 import EmailTable from '../components/EmailTable'
 import EmailStatsChart from '../components/EmailStatsChart'
 import Logo from '../components/Logo'
@@ -150,6 +150,65 @@ function Dashboard() {
       setSelectedEmails([])
     }
   }
+  
+  // Handle bulk delete selected emails
+  const handleBulkDelete = async () => {
+    if (selectedEmails.length === 0) {
+      alert('Please select emails to delete')
+      return
+    }
+    
+    if (!window.confirm(`Are you sure you want to delete ${selectedEmails.length} email(s)?`)) {
+      return
+    }
+    
+    try {
+      const result = await bulkDeleteEmails(selectedEmails)
+      console.log('✅ Bulk delete result:', result)
+      
+      // Clear selection
+      setSelectedEmails([])
+      
+      // Show success message
+      alert(`Successfully deleted ${result.results.successful} out of ${result.results.total} emails`)
+      
+      // Refresh emails and stats
+      fetchEmails()
+      fetchStats()
+    } catch (err) {
+      console.error('❌ Failed to bulk delete emails:', err)
+      alert('Failed to delete emails. Please try again.')
+    }
+  }
+  
+  // Handle clean all phishing emails
+  const handleCleanPhishing = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL phishing emails?')) {
+      return
+    }
+    
+    try {
+      const result = await cleanPhishingEmails()
+      console.log('✅ Clean phishing result:', result)
+      
+      // Clear selection
+      setSelectedEmails([])
+      
+      // Show success message
+      if (result.results.deleted > 0) {
+        alert(`Successfully cleaned ${result.results.deleted} phishing email(s)!\nStorage saved: ${result.results.storageSaved.mb} MB`)
+      } else {
+        alert('No phishing emails found to clean.')
+      }
+      
+      // Refresh emails and stats
+      fetchEmails()
+      fetchStats()
+    } catch (err) {
+      console.error('❌ Failed to clean phishing emails:', err)
+      alert('Failed to clean phishing emails. Please try again.')
+    }
+  }
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -270,6 +329,36 @@ function Dashboard() {
 
         {/* Analytics Chart */}
         <EmailStatsChart stats={stats} loading={statsLoading} />
+
+        {/* Action Buttons */}
+        <div className="mb-6 flex flex-wrap gap-4">
+          {/* Bulk Delete Button */}
+          <button
+            onClick={handleBulkDelete}
+            disabled={selectedEmails.length === 0}
+            className={`px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 ${
+              selectedEmails.length > 0
+                ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/50'
+                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Delete Selected ({selectedEmails.length})</span>
+          </button>
+
+          {/* Clean All Phishing Button */}
+          <button
+            onClick={handleCleanPhishing}
+            className="px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white rounded-lg font-semibold transition duration-200 flex items-center space-x-2 shadow-lg shadow-orange-900/50"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>🧹 Clean All Phishing</span>
+          </button>
+        </div>
 
         {/* Email List */}
         <EmailTable
