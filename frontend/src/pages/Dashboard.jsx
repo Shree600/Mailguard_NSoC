@@ -182,12 +182,16 @@ function Dashboard() {
     try {
       // Find the email
       const email = emails.find(e => e._id === emailId)
+      console.log('📧 Email for feedback:', email)
+      
       if (!email) {
         alert('Email not found')
         return
       }
 
       // Check if email is classified
+      console.log('🔍 Email prediction:', email.prediction, 'Type:', typeof email.prediction)
+      
       if (!email.prediction || email.prediction === 'pending') {
         alert('This email hasn\'t been classified yet. Please run "Fetch & Scan" first.')
         return
@@ -203,19 +207,24 @@ function Dashboard() {
         correctLabel = email.prediction.toLowerCase() === 'phishing' ? 'legitimate' : 'phishing'
       }
 
-      await submitFeedback({
+      const feedbackData = {
         emailId,
         correctLabel: correctLabel.toLowerCase()
-      })
+      }
+      
+      console.log('📝 Sending feedback:', feedbackData)
 
-      console.log('✅ Feedback submitted:', { emailId, correctLabel })
+      await submitFeedback(feedbackData)
+
+      console.log('✅ Feedback submitted successfully')
       alert('Thank you for your feedback! This helps improve our AI.')
       
       // Optionally refresh emails
       fetchEmails()
     } catch (err) {
       console.error('❌ Failed to submit feedback:', err)
-      alert('Failed to submit feedback. Please try again.')
+      console.error('❌ Error details:', err.response?.data)
+      alert(`Failed to submit feedback: ${err.response?.data?.error || err.message}`)
     }
   }
   

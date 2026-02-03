@@ -21,8 +21,11 @@ exports.submitFeedback = async (req, res) => {
     const { emailId, correctLabel, notes } = req.body;
     const userId = req.mongoUserId; // From syncUserMiddleware
 
+    console.log(`📝 Feedback request received:`, { emailId, correctLabel, notes, userId });
+
     // Validate required fields
     if (!emailId || !correctLabel) {
+      console.log('❌ Validation failed: Missing emailId or correctLabel');
       return res.status(400).json({
         success: false,
         error: 'emailId and correctLabel are required'
@@ -31,6 +34,7 @@ exports.submitFeedback = async (req, res) => {
 
     // Validate correctLabel value
     if (!['phishing', 'legitimate'].includes(correctLabel)) {
+      console.log(`❌ Validation failed: Invalid correctLabel "${correctLabel}"`);
       return res.status(400).json({
         success: false,
         error: 'correctLabel must be either "phishing" or "legitimate"'
