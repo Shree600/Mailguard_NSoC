@@ -32,7 +32,8 @@ createRoot(document.getElementById('root')).render(
         },
         elements: {
           rootBox: 'bg-black',
-          card: 'bg-gray-900/80 backdrop-blur-xl border border-gray-800 shadow-2xl',
+          card: 'bg-gray-900/80 backdrop-blur-xl border border-gray-800 shadow-2xl rounded-xl',
+          cardBox: 'shadow-none',
           headerTitle: 'text-white font-bold',
           headerSubtitle: 'text-gray-400',
           formFieldLabel: 'text-gray-300 font-medium',
@@ -42,8 +43,13 @@ createRoot(document.getElementById('root')).render(
           footerActionText: 'text-gray-400',
           socialButtonsBlockButton: 'bg-white hover:bg-gray-100 border-0 text-gray-900',
           socialButtonsBlockButtonText: 'text-gray-900 font-medium',
+          socialButtonsBlockButtonArrow: 'hidden',
           dividerLine: 'bg-gray-700',
           dividerText: 'text-gray-500',
+        },
+        layout: {
+          logoPlacement: 'inside',
+          shimmer: false,
         }
       }}
     >

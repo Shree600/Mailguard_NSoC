@@ -12,5 +12,18 @@ body {
   background-color: #000000;
 }
 
+/* Remove decorative corners from Clerk card */
+.cl-card::before,
+.cl-card::after,
+.cl-cardBox::before,
+.cl-cardBox::after {
+  display: none !important;
+}
+
+/* Force white text for Google button */
+.cl-socialButtonsBlockButton span {
+  color: #111827 !important;
+}
+
 
 
