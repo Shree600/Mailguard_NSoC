@@ -11,14 +11,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Force dark text on Google button */
-.cl-socialButtonsBlockButton span {
+/* Force white background and dark text on Google button */
+button[data-localization-key="socialButtonsBlockButton"] {
+  background-color: #ffffff !important;
   color: #1e293b !important;
 }
 
-/* Compact spacing */
+.cl-socialButtonsBlockButton {
+  background-color: #ffffff !important;
+}
+
+.cl-socialButtonsBlockButton span,
+.cl-socialButtonsBlockButton__text,
+.cl-socialButtonsBlockButtonText {
+  color: #1e293b !important;
+}
+
+/* Compact card spacing */
 .cl-card {
-  padding: 1.5rem !important;
+  padding: 1.25rem !important;
+}
+
+.cl-main {
+  gap: 0.75rem !important;
 }
 
 /* Smooth transitions */
@@ -27,4 +42,5 @@ body {
 .cl-formFieldInput {
   transition: all 0.2s ease;
 }
+
 
