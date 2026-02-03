@@ -199,6 +199,8 @@ function Dashboard() {
 
       // Normalize prediction - ML returns "safe" but backend expects "legitimate"
       const normalizedPrediction = email.prediction.toLowerCase() === 'safe' ? 'legitimate' : email.prediction.toLowerCase()
+      
+      console.log('🔄 Normalized prediction:', normalizedPrediction, 'from:', email.prediction)
 
       // Determine correct label based on feedback type
       let correctLabel
@@ -209,10 +211,12 @@ function Dashboard() {
         // Wrong prediction, flip it
         correctLabel = normalizedPrediction === 'phishing' ? 'legitimate' : 'phishing'
       }
+      
+      console.log('✅ Final correctLabel:', correctLabel)
 
       const feedbackData = {
         emailId,
-        correctLabel: correctLabel.toLowerCase()
+        correctLabel: correctLabel  // Already normalized and lowercase, don't call toLowerCase again
       }
       
       console.log('📝 Sending feedback:', feedbackData)
@@ -230,7 +234,10 @@ function Dashboard() {
       
       // Handle specific error types
       if (err.response?.status === 403) {
-        alert('⚠️ This email belongs to another user. Please click "Fix Now" on the yellow banner at the top to migrate all emails to your account!')
+        const shouldMigrate = window.confirm('⚠️ MIGRATION NEEDED!\n\nThis email belongs to your old account. Click OK to automatically migrate ALL emails to your current account.\n\nThis will fix the feedback errors for all emails.')
+        if (shouldMigrate) {
+          handleMigrateEmails()
+        }
       } else if (err.response?.status === 400) {
         alert(`❌ Invalid feedback data: ${err.response?.data?.error || 'Unknown error'}`)
       } else {
