@@ -43,7 +43,7 @@ const getAuthUrl = () => {
 
   // Define scopes - what permissions we're requesting
   const scopes = [
-    'https://www.googleapis.com/auth/gmail.readonly',  // Read emails
+    'https://www.googleapis.com/auth/gmail.modify',    // Read and delete emails
     'https://www.googleapis.com/auth/userinfo.email',  // Get user email
     'https://www.googleapis.com/auth/userinfo.profile' // Get user profile
   ];

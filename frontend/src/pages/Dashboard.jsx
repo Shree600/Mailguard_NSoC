@@ -182,7 +182,16 @@ function Dashboard() {
     try {
       // Find the email
       const email = emails.find(e => e._id === emailId)
-      if (!email) return
+      if (!email) {
+        alert('Email not found')
+        return
+      }
+
+      // Check if email is classified
+      if (!email.prediction || email.prediction === 'pending') {
+        alert('This email hasn\'t been classified yet. Please run "Fetch & Scan" first.')
+        return
+      }
 
       // Determine correct label based on feedback type
       let correctLabel
@@ -191,7 +200,7 @@ function Dashboard() {
         correctLabel = email.prediction
       } else {
         // Wrong prediction, flip it
-        correctLabel = email.prediction?.toLowerCase() === 'phishing' ? 'legitimate' : 'phishing'
+        correctLabel = email.prediction.toLowerCase() === 'phishing' ? 'legitimate' : 'phishing'
       }
 
       await submitFeedback({
