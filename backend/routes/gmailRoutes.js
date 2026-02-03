@@ -13,6 +13,7 @@ const {
 
 // Import JWT authentication middleware
 const authMiddleware = require('../middleware/authMiddleware');
+const syncUserMiddleware = require('../middleware/syncUserMiddleware');
 
 /**
  * GMAIL OAUTH ROUTES
@@ -26,7 +27,7 @@ const authMiddleware = require('../middleware/authMiddleware');
  * @header  Authorization: Bearer <token>
  * @returns Authorization URL to redirect user to Google consent screen
  */
-router.get('/auth', authMiddleware, initiateGmailAuth);
+router.get('/auth', authMiddleware, syncUserMiddleware, initiateGmailAuth);
 
 /**
  * @route   GET /api/gmail/callback
@@ -45,7 +46,7 @@ router.get('/callback', handleGmailCallback);
  * @header  Authorization: Bearer <token>
  * @returns Gmail connection status
  */
-router.get('/status', authMiddleware, checkGmailStatus);
+router.get('/status', authMiddleware, syncUserMiddleware, checkGmailStatus);
 
 /**
  * @route   DELETE /api/gmail/disconnect
@@ -54,7 +55,7 @@ router.get('/status', authMiddleware, checkGmailStatus);
  * @header  Authorization: Bearer <token>
  * @returns Success message
  */
-router.delete('/disconnect', authMiddleware, disconnectGmail);
+router.delete('/disconnect', authMiddleware, syncUserMiddleware, disconnectGmail);
 /**
  * @route   POST /api/gmail/fetch
  * @desc    Fetch emails from Gmail and save to database
@@ -63,6 +64,6 @@ router.delete('/disconnect', authMiddleware, disconnectGmail);
  * @query   maxResults - Number of emails to fetch (default: 20, max: 100)
  * @returns Statistics about fetched and saved emails
  */
-router.post('/fetch', authMiddleware, fetchAndSaveEmails);
+router.post('/fetch', authMiddleware, syncUserMiddleware, fetchAndSaveEmails);
 // Export the router
 module.exports = router;

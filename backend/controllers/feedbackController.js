@@ -19,7 +19,7 @@ const Email = require('../models/Email');
 exports.submitFeedback = async (req, res) => {
   try {
     const { emailId, correctLabel, notes } = req.body;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.mongoUserId; // From syncUserMiddleware
 
     // Validate required fields
     if (!emailId || !correctLabel) {

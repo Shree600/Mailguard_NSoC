@@ -12,8 +12,8 @@ const { fetchEmails } = require('../services/gmailService');
  */
 const initiateGmailAuth = async (req, res) => {
   try {
-    // userId is attached by authMiddleware from JWT token
-    const userId = req.userId;
+    // MongoDB user ID is attached by syncUserMiddleware
+    const userId = req.mongoUserId;
 
     // Generate Google OAuth authorization URL
     const authUrl = getAuthUrl();
@@ -110,26 +110,16 @@ const handleGmailCallback = async (req, res) => {
       });
     }
 
-    // Success response
-    res.status(200).json({
-      success: true,
-      message: 'Gmail connected successfully!',
-      data: {
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        gmailConnected: true,
-        connectedAt: user.gmailConnectedAt
-      }
-    });
+    // Redirect to dashboard with success message
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/dashboard?gmail=connected`);
 
   } catch (error) {
     console.error('Gmail callback error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to complete Gmail authorization',
-      error: error.message
-    });
+    
+    // Redirect to dashboard with error message
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent(error.message)}`);
   }
 };
 
@@ -141,7 +131,7 @@ const handleGmailCallback = async (req, res) => {
  */
 const checkGmailStatus = async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.mongoUserId;
 
     // Get user from database
     const user = await User.findById(userId).select('gmailAccessToken gmailConnectedAt');
@@ -182,7 +172,7 @@ const checkGmailStatus = async (req, res) => {
  */
 const disconnectGmail = async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.mongoUserId;
 
     // Remove Gmail tokens from user
     const user = await User.findByIdAndUpdate(
@@ -231,7 +221,7 @@ const disconnectGmail = async (req, res) => {
  */
 const fetchAndSaveEmails = async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.mongoUserId;
 
     // Get maxResults from query parameter or default to 20
     const maxResults = parseInt(req.query.maxResults) || 20;

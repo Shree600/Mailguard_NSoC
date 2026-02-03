@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useUser, useClerk } from '@clerk/clerk-react'
-import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback } from '../services/api'
+import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails } from '../services/api'
 import EmailTable from '../components/EmailTable'
 import EmailStatsChart from '../components/EmailStatsChart'
 import Logo from '../components/Logo'
@@ -36,11 +36,32 @@ function Dashboard() {
   
   // Multi-select state
   const [selectedEmails, setSelectedEmails] = useState([])
+  
+  // Gmail connection state
+  const [fetchingEmails, setFetchingEmails] = useState(false)
+  const [gmailConnected, setGmailConnected] = useState(false)
 
   // Fetch stats and emails on component mount
   useEffect(() => {
     fetchStats()
     fetchEmails()
+    checkGmailConnection()
+    
+    // Check for Gmail connection status in URL
+    const urlParams = new URLSearchParams(window.location.search)
+    const gmailStatus = urlParams.get('gmail')
+    
+    if (gmailStatus === 'connected') {
+      alert('✅ Gmail connected successfully! You can now fetch emails.')
+      setGmailConnected(true)
+      // Clean URL
+      window.history.replaceState({}, '', '/dashboard')
+    } else if (gmailStatus === 'error') {
+      const errorMessage = urlParams.get('message') || 'Failed to connect Gmail'
+      alert(`❌ ${errorMessage}`)
+      // Clean URL
+      window.history.replaceState({}, '', '/dashboard')
+    }
   }, [])
 
   const fetchStats = async () => {
@@ -80,6 +101,20 @@ function Dashboard() {
       setEmails([])
     } finally {
       setEmailsLoading(false)
+    }
+  }
+  
+  const checkGmailConnection = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/gmail/status', {
+        headers: {
+          'Authorization': `Bearer ${await window.Clerk.session?.getToken()}`
+        }
+      })
+      const data = await response.json()
+      setGmailConnected(data.data?.gmailConnected || false)
+    } catch (err) {
+      console.error('❌ Failed to check Gmail status:', err)
     }
   }
 
@@ -236,6 +271,58 @@ function Dashboard() {
       await signOut()
     }
   }
+  
+  // Handle Gmail connection
+  const handleConnectGmail = async () => {
+    try {
+      const response = await initiateGmailAuth()
+      
+      if (response.data && response.data.authUrl) {
+        // Redirect to Google OAuth
+        window.location.href = response.data.authUrl
+      }
+    } catch (err) {
+      console.error('❌ Failed to initiate Gmail auth:', err)
+      alert('Failed to connect Gmail. Please try again.')
+    }
+  }
+  
+  // Handle fetching emails from Gmail
+  const handleFetchEmails = async () => {
+    if (!window.confirm('Fetch latest emails from Gmail and scan for phishing?')) {
+      return
+    }
+    
+    try {
+      setFetchingEmails(true)
+      
+      // Step 1: Fetch emails from Gmail
+      const fetchResponse = await fetchGmailEmails()
+      console.log('✅ Emails fetched:', fetchResponse)
+      
+      // Step 2: Classify the emails
+      console.log('🤖 Classifying emails...')
+      const classifyResponse = await classifyEmails()
+      console.log('✅ Emails classified:', classifyResponse)
+      
+      alert(`Successfully fetched ${fetchResponse.data.fetched} emails!\nClassified: ${classifyResponse.stats.processed} | Phishing: ${classifyResponse.stats.phishing} | Safe: ${classifyResponse.stats.safe}`)
+      
+      // Refresh emails and stats
+      fetchEmails()
+      fetchStats()
+    } catch (err) {
+      console.error('❌ Failed to fetch emails:', err)
+      
+      // Check if Gmail not connected
+      if (err.response?.status === 400) {
+        alert('Gmail not connected. Please connect your Gmail account first.')
+      } else {
+        alert('Failed to fetch emails. Please try again.')
+      }
+    } finally {
+      setFetchingEmails(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-black">
@@ -270,6 +357,72 @@ function Dashboard() {
           <p className="text-gray-400">
             Here's your email security overview
           </p>
+        </div>
+        
+        {/* Gmail Connection Section */}
+        <div className="mb-8 bg-gradient-to-r from-blue-900/40 to-purple-900/40 backdrop-blur-sm rounded-xl border border-blue-500/30 p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-blue-600/30 rounded-lg border border-blue-400/40">
+                <svg className="w-8 h-8 text-blue-300" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+                </svg>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-xl font-semibold text-white">Gmail Integration</h3>
+                  {gmailConnected && (
+                    <span className="px-3 py-1 bg-green-600/20 border border-green-500/50 rounded-full text-xs text-green-300 font-semibold">
+                      ✓ Connected
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-300">
+                  {gmailConnected ? 'Fetch and scan your emails for phishing threats' : 'Connect your Gmail to scan and protect your inbox'}
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-4">
+              {!gmailConnected ? (
+                <button
+                  onClick={handleConnectGmail}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold rounded-lg transition duration-200 shadow-lg shadow-blue-900/50 flex items-center space-x-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>Connect Gmail</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleFetchEmails}
+                  disabled={fetchingEmails}
+                  className={`px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 ${
+                    fetchingEmails
+                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/50'
+                  }`}
+                >
+                  {fetchingEmails ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Fetching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>Fetch & Scan</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}

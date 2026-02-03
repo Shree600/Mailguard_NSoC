@@ -221,5 +221,19 @@ export const fetchGmailEmails = async () => {
   }
 }
 
+/**
+ * Classify unclassified emails
+ * @returns {Promise} Classification results
+ */
+export const classifyEmails = async () => {
+  try {
+    const response = await api.post('/emails/classify')
+    return response.data
+  } catch (error) {
+    console.error('❌ Failed to classify emails:', error)
+    throw error
+  }
+}
+
 // Export the axios instance for custom requests
 export default api

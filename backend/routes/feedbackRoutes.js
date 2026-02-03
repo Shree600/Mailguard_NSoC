@@ -5,9 +5,11 @@ const express = require('express');
 const router = express.Router();
 const feedbackController = require('../controllers/feedbackController');
 const authMiddleware = require('../middleware/authMiddleware');
+const syncUserMiddleware = require('../middleware/syncUserMiddleware');
 
 // All feedback routes require authentication
 router.use(authMiddleware);
+router.use(syncUserMiddleware);
 
 /**
  * POST /api/feedback

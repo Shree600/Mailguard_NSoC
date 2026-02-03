@@ -71,10 +71,12 @@ app.listen(PORT, () => {
   // Initialize automatic retraining scheduler
   // Runs model retraining based on schedule (default: 2 AM daily)
   // Set RETRAIN_SCHEDULE env variable to customize (e.g., '*/1 * * * *' for testing)
-  startScheduler();
+  // TEMPORARILY DISABLED - Causing server crash
+  // startScheduler();
   
   // Initialize nightly email scan and cleanup job
   // Automatically fetches, classifies, and deletes phishing emails
   // Runs every night at 2 AM
-  startScanJob();
+  // TEMPORARILY DISABLED - Causing server crash
+  // startScanJob();
 });

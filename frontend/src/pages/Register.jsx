@@ -28,14 +28,8 @@ function Register() {
         </div>
 
         {/* Clerk SignUp Component */}
-        <div className="flex justify-center">
+        <div className="flex justify-center w-full">
           <SignUp 
-            appearance={{
-              elements: {
-                rootBox: 'mx-auto',
-                card: 'bg-transparent shadow-none',
-              },
-            }}
             routing="path"
             path="/register"
             signInUrl="/login"

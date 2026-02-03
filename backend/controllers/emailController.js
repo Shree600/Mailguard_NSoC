@@ -113,27 +113,30 @@ exports.classifyEmails = async (req, res) => {
  */
 exports.getClassificationStats = async (req, res) => {
   try {
-    const stats = await Classification.aggregate([
-      {
-        $group: {
-          _id: '$prediction',
-          count: { $sum: 1 },
-          avgConfidence: { $avg: '$confidence' }
-        }
-      }
-    ]);
+    const userId = req.mongoUserId;
 
-    const totalEmails = await Email.countDocuments();
-    const classifiedCount = await Classification.countDocuments();
+    // Get user's emails
+    const userEmails = await Email.find({ userId }).select('_id');
+    const emailIds = userEmails.map(e => e._id);
+
+    // Get classifications for user's emails
+    const classifications = await Classification.find({
+      emailId: { $in: emailIds }
+    });
+
+    // Count by prediction
+    const phishing = classifications.filter(c => c.prediction === 'phishing').length;
+    const safe = classifications.filter(c => c.prediction === 'safe').length;
+    const total = userEmails.length;
 
     res.json({
       success: true,
-      data: {
-        totalEmails,
-        classifiedCount,
-        unclassifiedCount: totalEmails - classifiedCount,
-        byPrediction: stats
-      }
+      total: total,
+      phishing: phishing,
+      safe: safe,
+      legitimate: safe,
+      classified: classifications.length,
+      unclassified: total - classifications.length
     });
 
   } catch (error) {
@@ -151,24 +154,52 @@ exports.getClassificationStats = async (req, res) => {
  */
 exports.getClassifiedEmails = async (req, res) => {
   try {
-    const { prediction, limit = 50 } = req.query;
+    const userId = req.mongoUserId;
+    const { prediction, limit = 100 } = req.query;
 
-    // Build query
-    const query = {};
-    if (prediction) {
-      query.prediction = prediction;
-    }
-
-    const classifications = await Classification
-      .find(query)
-      .populate('emailId')
-      .sort({ createdAt: -1 })
+    // Get user's emails
+    const userEmails = await Email.find({ userId })
+      .sort({ receivedAt: -1 })
       .limit(parseInt(limit));
+
+    // Get classifications for these emails
+    const emailIds = userEmails.map(e => e._id);
+    const classifications = await Classification.find({
+      emailId: { $in: emailIds }
+    });
+
+    // Create a map of emailId -> classification
+    const classificationMap = {};
+    classifications.forEach(c => {
+      classificationMap[c.emailId.toString()] = c;
+    });
+
+    // Combine emails with their classifications
+    const emailsWithClassifications = userEmails.map(email => {
+      const classification = classificationMap[email._id.toString()];
+      return {
+        _id: email._id,
+        subject: email.subject,
+        sender: email.sender,
+        body: email.body?.substring(0, 200) || '',
+        receivedAt: email.receivedAt,
+        gmailId: email.gmailId,
+        prediction: classification?.prediction || 'pending',
+        confidence: classification?.confidence || 0,
+        classified: !!classification
+      };
+    });
+
+    // Filter by prediction if specified
+    let filteredEmails = emailsWithClassifications;
+    if (prediction) {
+      filteredEmails = emailsWithClassifications.filter(e => e.prediction === prediction);
+    }
 
     res.json({
       success: true,
-      count: classifications.length,
-      data: classifications
+      count: filteredEmails.length,
+      emails: filteredEmails
     });
 
   } catch (error) {
@@ -187,7 +218,7 @@ exports.getClassifiedEmails = async (req, res) => {
 exports.deleteEmail = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.mongoUserId; // From syncUserMiddleware
 
     console.log(`🗑️  Delete request for email ID: ${id} by user: ${userId}`);
 
@@ -264,7 +295,7 @@ exports.deleteEmail = async (req, res) => {
 exports.bulkDeleteEmails = async (req, res) => {
   try {
     const { emailIds } = req.body;
-    const userId = req.user.id; // From auth middleware
+    const userId = req.mongoUserId; // From syncUserMiddleware
 
     console.log(`🗑️  Bulk delete request for ${emailIds?.length || 0} emails by user: ${userId}`);
 
@@ -380,7 +411,7 @@ exports.bulkDeleteEmails = async (req, res) => {
  */
 exports.cleanPhishingEmails = async (req, res) => {
   try {
-    const userId = req.user.id; // From auth middleware
+    const userId = req.mongoUserId; // From syncUserMiddleware
 
     console.log(`🧹 Auto-clean phishing emails request by user: ${userId}`);
 

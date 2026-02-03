@@ -5,9 +5,11 @@ const express = require('express');
 const router = express.Router();
 const emailController = require('../controllers/emailController');
 const authMiddleware = require('../middleware/authMiddleware');
+const syncUserMiddleware = require('../middleware/syncUserMiddleware');
 
-// All email routes require authentication
+// All email routes require authentication and user sync
 router.use(authMiddleware);
+router.use(syncUserMiddleware);
 
 // Classify all unclassified emails
 router.post('/classify', emailController.classifyEmails);
