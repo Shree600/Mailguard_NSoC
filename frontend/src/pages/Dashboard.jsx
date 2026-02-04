@@ -45,6 +45,35 @@ function Dashboard() {
   const [migrationNeeded, setMigrationNeeded] = useState(false)
   const [migrating, setMigrating] = useState(false)
 
+  // Filter and pagination state
+  const [filters, setFilters] = useState({
+    page: 1,
+    limit: 50,
+    prediction: '',
+    search: '',
+    dateFrom: '',
+    dateTo: '',
+    sortBy: 'receivedAt',
+    sortOrder: 'desc'
+  })
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false
+  })
+
+  // Gmail fetch options state
+  const [gmailFetchOptions, setGmailFetchOptions] = useState({
+    maxResults: 50,
+    dateFrom: '',
+    dateTo: '',
+    query: ''
+  })
+  const [showFetchOptions, setShowFetchOptions] = useState(false)
+
   // Fetch stats and emails on component mount
   useEffect(() => {
     fetchStats()
@@ -91,14 +120,20 @@ function Dashboard() {
     }
   }
 
-  const fetchEmails = async () => {
+  const fetchEmails = async (customFilters = {}) => {
     try {
       setEmailsLoading(true)
-      const response = await getEmails()
+      const params = { ...filters, ...customFilters }
+      const response = await getEmails(params)
       
       // Handle different response formats
       const emailList = response.emails || response.data || response || []
       setEmails(emailList)
+      
+      // Update pagination info if provided
+      if (response.pagination) {
+        setPagination(response.pagination)
+      }
       
       console.log('✅ Emails loaded:', emailList.length, 'emails')
     } catch (err) {
@@ -376,15 +411,15 @@ function Dashboard() {
   
   // Handle fetching emails from Gmail
   const handleFetchEmails = async (skipConfirm = false) => {
-    if (!skipConfirm && !window.confirm('Fetch latest emails from Gmail and scan for phishing?')) {
+    if (!skipConfirm && !showFetchOptions && !window.confirm('Fetch latest emails from Gmail and scan for phishing?')) {
       return
     }
     
     try {
       setFetchingEmails(true)
       
-      // Step 1: Fetch emails from Gmail
-      const fetchResponse = await fetchGmailEmails()
+      // Step 1: Fetch emails from Gmail with user options
+      const fetchResponse = await fetchGmailEmails(gmailFetchOptions)
       console.log('✅ Emails fetched:', fetchResponse)
       
       // Step 2: Classify the emails
@@ -403,6 +438,7 @@ function Dashboard() {
       // Refresh emails and stats
       fetchEmails()
       fetchStats()
+      setShowFetchOptions(false) // Close options dialog
       
       // Auto-refetch if we got all new emails (means there might be more)
       if (fetchResponse.data.shouldRefetch && fetchResponse.data.saved === fetchResponse.data.fetched) {
@@ -542,35 +578,135 @@ function Dashboard() {
                   <span>Connect Gmail</span>
                 </button>
               ) : (
-                <button
-                  onClick={handleFetchEmails}
-                  disabled={fetchingEmails}
-                  className={`px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 ${
-                    fetchingEmails
-                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/50'
-                  }`}
-                >
-                  {fetchingEmails ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Fetching...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <span>Fetch & Scan</span>
-                    </>
-                  )}
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowFetchOptions(!showFetchOptions)}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition duration-200 flex items-center space-x-2 shadow-lg shadow-blue-900/50"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                    <span>Fetch Options</span>
+                  </button>
+                  <button
+                    onClick={handleFetchEmails}
+                    disabled={fetchingEmails}
+                    className={`px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 ${
+                      fetchingEmails
+                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/50'
+                    }`}
+                  >
+                    {fetchingEmails ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Fetching...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>Fetch & Scan</span>
+                      </>
+                    )}
+                  </button>
+                </>
               )}
             </div>
           </div>
+          
+          {/* Gmail Fetch Options Dialog */}
+          {showFetchOptions && gmailConnected && (
+            <div className="mt-4 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+              <h4 className="text-lg font-semibold text-white mb-4">Gmail Fetch Options</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Number of Emails (1-100)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={gmailFetchOptions.maxResults}
+                    onChange={(e) => setGmailFetchOptions({ ...gmailFetchOptions, maxResults: parseInt(e.target.value) || 50 })}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Gmail Search Query (optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., is:unread, has:attachment"
+                    value={gmailFetchOptions.query}
+                    onChange={(e) => setGmailFetchOptions({ ...gmailFetchOptions, query: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={gmailFetchOptions.dateFrom}
+                    onChange={(e) => setGmailFetchOptions({ ...gmailFetchOptions, dateFrom: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={gmailFetchOptions.dateTo}
+                    onChange={(e) => setGmailFetchOptions({ ...gmailFetchOptions, dateTo: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={handleFetchEmails}
+                  disabled={fetchingEmails}
+                  className={`px-6 py-2 rounded-lg font-semibold transition duration-200 ${
+                    fetchingEmails
+                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                >
+                  Fetch with Options
+                </button>
+                <button
+                  onClick={() => setShowFetchOptions(false)}
+                  className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+              
+              <div className="mt-3 text-xs text-gray-500">
+                <p>💡 <strong>Tips:</strong></p>
+                <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                  <li>Search query examples: "from:example@gmail.com", "subject:invoice", "is:unread"</li>
+                  <li>Leave dates empty to fetch recent emails</li>
+                  <li>Maximum 100 emails per fetch</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Stats Cards */}
@@ -667,6 +803,170 @@ function Dashboard() {
 
         {/* Analytics Chart */}
         <EmailStatsChart stats={stats} loading={statsLoading} />
+
+        {/* Filters and Search Section */}
+        <div className="mb-6 bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-6">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filters & Search
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Search Input */}
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-gray-400 mb-2">Search</label>
+              <input
+                type="text"
+                placeholder="Search subject, sender, or body..."
+                value={filters.search}
+                onChange={(e) => {
+                  setFilters({ ...filters, search: e.target.value, page: 1 })
+                }}
+                onKeyPress={(e) => e.key === 'Enter' && fetchEmails()}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Classification Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Type</label>
+              <select
+                value={filters.prediction}
+                onChange={(e) => {
+                  setFilters({ ...filters, prediction: e.target.value, page: 1 })
+                  fetchEmails({ prediction: e.target.value, page: 1 })
+                }}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="">All Emails</option>
+                <option value="phishing">🚨 Phishing</option>
+                <option value="safe">✅ Safe</option>
+                <option value="pending">⏳ Pending</option>
+              </select>
+            </div>
+
+            {/* Items Per Page */}
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">Per Page</label>
+              <select
+                value={filters.limit}
+                onChange={(e) => {
+                  setFilters({ ...filters, limit: parseInt(e.target.value), page: 1 })
+                  fetchEmails({ limit: parseInt(e.target.value), page: 1 })
+                }}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Date Range Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">From Date</label>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value, page: 1 })}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">To Date</label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => setFilters({ ...filters, dateTo: e.target.value, page: 1 })}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Apply Filters Button */}
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={() => fetchEmails()}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition duration-200"
+            >
+              Apply Filters
+            </button>
+            <button
+              onClick={() => {
+                setFilters({
+                  page: 1,
+                  limit: 50,
+                  prediction: '',
+                  search: '',
+                  dateFrom: '',
+                  dateTo: '',
+                  sortBy: 'receivedAt',
+                  sortOrder: 'desc'
+                })
+                fetchEmails({
+                  page: 1,
+                  limit: 50,
+                  prediction: '',
+                  search: '',
+                  dateFrom: '',
+                  dateTo: ''
+                })
+              }}
+              className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition duration-200"
+            >
+              Reset
+            </button>
+          </div>
+
+          {/* Pagination Info */}
+          {pagination.total > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between">
+              <div className="text-sm text-gray-400">
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} emails
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const newPage = pagination.page - 1
+                    setFilters({ ...filters, page: newPage })
+                    fetchEmails({ page: newPage })
+                  }}
+                  disabled={!pagination.hasPrev}
+                  className={`px-4 py-2 rounded-lg font-semibold transition duration-200 ${
+                    pagination.hasPrev
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                      : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                  }`}
+                >
+                  ← Previous
+                </button>
+                <div className="px-4 py-2 bg-gray-800 rounded-lg text-white">
+                  Page {pagination.page} of {pagination.totalPages}
+                </div>
+                <button
+                  onClick={() => {
+                    const newPage = pagination.page + 1
+                    setFilters({ ...filters, page: newPage })
+                    fetchEmails({ page: newPage })
+                  }}
+                  disabled={!pagination.hasNext}
+                  className={`px-4 py-2 rounded-lg font-semibold transition duration-200 ${
+                    pagination.hasNext
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                      : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                  }`}
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Action Buttons */}
         <div className="mb-6 flex flex-wrap gap-4">

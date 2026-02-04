@@ -218,21 +218,24 @@ const disconnectGmail = async (req, res) => {
  * @route   POST /api/gmail/fetch
  * @access  Protected (requires JWT token)
  * @desc    Fetch emails from Gmail and save to database
+ * @body    { maxResults, dateFrom, dateTo, query }
  */
 const fetchAndSaveEmails = async (req, res) => {
   try {
     const userId = req.mongoUserId;
 
-    // Get maxResults from query parameter or default to 50 (increased for better coverage)
-    const maxResults = parseInt(req.query.maxResults) || 50;
+    // Get parameters from request body
+    const { 
+      maxResults = 50,
+      dateFrom,
+      dateTo,
+      query = '' // Gmail search query (e.g., "from:someone@example.com" or "has:attachment")
+    } = req.body;
 
     // Validate maxResults
-    if (maxResults < 1 || maxResults > 100) {
-      return res.status(400).json({
-        success: false,
-        message: 'maxResults must be between 1 and 100'
-      });
-    }
+    const validatedMax = Math.min(Math.max(parseInt(maxResults), 1), 100); // Between 1 and 100
+    
+    console.log(`📋 Fetch params: maxResults=${validatedMax}, dateFrom=${dateFrom || 'none'}, dateTo=${dateTo || 'none'}, query="${query}"`);
 
     // Get user from database
     const user = await User.findById(userId);
@@ -254,10 +257,30 @@ const fetchAndSaveEmails = async (req, res) => {
     }
 
     console.log(`\n📧 Starting email fetch for user: ${user.email}`);
-    console.log(`   Fetching up to ${maxResults} emails...\n`);
+    console.log(`   Fetching up to ${validatedMax} emails...\n`);
+
+    // Build Gmail search query
+    let gmailSearchQuery = 'in:inbox';
+    
+    // Add date filters if provided
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      gmailSearchQuery += ` after:${fromDate.getFullYear()}/${(fromDate.getMonth() + 1)}/${fromDate.getDate()}`;
+    }
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      gmailSearchQuery += ` before:${toDate.getFullYear()}/${(toDate.getMonth() + 1)}/${toDate.getDate()}`;
+    }
+    
+    // Add user's custom query if provided
+    if (query) {
+      gmailSearchQuery += ` ${query}`;
+    }
+    
+    console.log(`🔍 Gmail search query: "${gmailSearchQuery}"\n`);
 
     // Fetch emails from Gmail using service
-    const fetchedEmails = await fetchEmails(user, maxResults);
+    const fetchedEmails = await fetchEmails(user, validatedMax, gmailSearchQuery);
 
     if (fetchedEmails.length === 0) {
       return res.status(200).json({

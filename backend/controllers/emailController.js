@@ -151,16 +151,63 @@ exports.getClassificationStats = async (req, res) => {
 /**
  * Get all classified emails with predictions
  * GET /api/emails/classified
+ * Query params: page, limit, prediction, search, dateFrom, dateTo
  */
 exports.getClassifiedEmails = async (req, res) => {
   try {
     const userId = req.mongoUserId;
-    const { prediction, limit = 100 } = req.query;
+    const { 
+      prediction, 
+      limit = 50, 
+      page = 1,
+      search = '',
+      dateFrom,
+      dateTo,
+      sortBy = 'receivedAt',
+      sortOrder = 'desc'
+    } = req.query;
 
-    // Get user's emails
-    const userEmails = await Email.find({ userId })
-      .sort({ receivedAt: -1 })
-      .limit(parseInt(limit));
+    // Build filter query
+    const filter = { userId };
+    
+    // Add date range filter if provided
+    if (dateFrom || dateTo) {
+      filter.receivedAt = {};
+      if (dateFrom) {
+        filter.receivedAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        filter.receivedAt.$lte = new Date(dateTo);
+      }
+    }
+    
+    // Add search filter if provided
+    if (search) {
+      filter.$or = [
+        { subject: { $regex: search, $options: 'i' } },
+        { sender: { $regex: search, $options: 'i' } },
+        { body: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Calculate pagination
+    const limitNum = Math.min(Math.max(parseInt(limit), 1), 100); // Between 1 and 100
+    const pageNum = Math.max(parseInt(page), 1);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const totalEmails = await Email.countDocuments(filter);
+    const totalPages = Math.ceil(totalEmails / limitNum);
+
+    // Determine sort direction
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+    const sortObj = { [sortBy]: sortDirection };
+
+    // Get user's emails with pagination
+    const userEmails = await Email.find(filter)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(limitNum);
 
     // Get classifications for these emails
     const emailIds = userEmails.map(e => e._id);
@@ -190,7 +237,7 @@ exports.getClassifiedEmails = async (req, res) => {
       };
     });
 
-    // Filter by prediction if specified
+    // Filter by prediction if specified (post-query filter for pending emails)
     let filteredEmails = emailsWithClassifications;
     if (prediction) {
       filteredEmails = emailsWithClassifications.filter(e => e.prediction === prediction);
@@ -198,6 +245,14 @@ exports.getClassifiedEmails = async (req, res) => {
 
     res.json({
       success: true,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalEmails,
+        totalPages: totalPages,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1
+      },
       count: filteredEmails.length,
       emails: filteredEmails
     });

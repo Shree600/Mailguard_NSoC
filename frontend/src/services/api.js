@@ -84,11 +84,20 @@ api.interceptors.response.use(
 
 /**
  * Get all emails for authenticated user
- * @returns {Promise} List of emails with predictions
+ * @param {Object} params - Query parameters
+ * @param {number} params.page - Page number (default: 1)
+ * @param {number} params.limit - Items per page (default: 50)
+ * @param {string} params.prediction - Filter by prediction type (phishing/safe/pending)
+ * @param {string} params.search - Search query
+ * @param {string} params.dateFrom - Start date filter (ISO string)
+ * @param {string} params.dateTo - End date filter (ISO string)
+ * @param {string} params.sortBy - Sort field (default: receivedAt)
+ * @param {string} params.sortOrder - Sort order (asc/desc, default: desc)
+ * @returns {Promise} List of emails with predictions and pagination info
  */
-export const getEmails = async () => {
+export const getEmails = async (params = {}) => {
   try {
-    const response = await api.get('/emails')
+    const response = await api.get('/emails', { params })
     return response.data
   } catch (error) {
     console.error('❌ Failed to fetch emails:', error)
@@ -209,11 +218,16 @@ export const initiateGmailAuth = async () => {
 
 /**
  * Fetch emails from Gmail
+ * @param {Object} params - Fetch parameters
+ * @param {number} params.maxResults - Max emails to fetch (1-100, default: 50)
+ * @param {string} params.dateFrom - Start date (ISO string)
+ * @param {string} params.dateTo - End date (ISO string)
+ * @param {string} params.query - Gmail search query
  * @returns {Promise} Fetched emails count
  */
-export const fetchGmailEmails = async () => {
+export const fetchGmailEmails = async (params = {}) => {
   try {
-    const response = await api.post('/gmail/fetch')
+    const response = await api.post('/gmail/fetch', params)
     return response.data
   } catch (error) {
     console.error('❌ Failed to fetch Gmail emails:', error)

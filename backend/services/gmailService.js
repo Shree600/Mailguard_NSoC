@@ -10,9 +10,10 @@ const { getGmailClient } = require('../config/googleOAuth');
  * Fetch emails from Gmail for a user
  * @param {Object} user - User object with Gmail tokens
  * @param {number} maxResults - Maximum number of emails to fetch (default: 20)
+ * @param {string} searchQuery - Gmail search query (default: 'in:inbox')
  * @returns {Promise<Array>} Array of parsed email objects
  */
-const fetchEmails = async (user, maxResults = 20) => {
+const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
   try {
     // Validate user has Gmail tokens
     if (!user.gmailAccessToken) {
@@ -23,12 +24,13 @@ const fetchEmails = async (user, maxResults = 20) => {
     const gmail = getGmailClient(user.gmailAccessToken, user.gmailRefreshToken);
 
     console.log(`📧 Fetching latest ${maxResults} emails for user: ${user.email}`);
+    console.log(`🔍 Using search query: "${searchQuery}"`);
 
     // Step 1: List message IDs
     const listResponse = await gmail.users.messages.list({
       userId: 'me',
       maxResults: maxResults,
-      q: '', // Empty query gets all emails, can add filters like 'is:unread'
+      q: searchQuery, // Use provided search query
     });
 
     // Check if any messages exist
