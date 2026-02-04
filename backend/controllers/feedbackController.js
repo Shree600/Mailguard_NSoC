@@ -53,7 +53,8 @@ exports.submitFeedback = async (req, res) => {
     }
 
     // Check if email belongs to this user (security check)
-    if (email.userId.toString() !== userId) {
+    if (email.userId.toString() !== userId.toString()) {
+      console.log(`⚠️ UserId mismatch: email.userId=${email.userId.toString()}, req.mongoUserId=${userId.toString()}`);
       return res.status(403).json({
         success: false,
         error: 'You can only provide feedback on your own emails'

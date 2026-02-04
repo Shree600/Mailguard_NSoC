@@ -82,8 +82,8 @@ function EmailStatsChart({ stats, loading }) {
       <h3 className="text-lg font-semibold text-white mb-4">Email Distribution</h3>
       
       {/* Chart */}
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 min-h-[256px]">
+        <ResponsiveContainer width="100%" height="100%" minHeight={256}>
           <PieChart>
             <Pie
               data={data}
