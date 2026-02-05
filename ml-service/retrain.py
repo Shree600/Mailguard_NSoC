@@ -124,6 +124,18 @@ class ModelRetrainer:
             df = df.dropna(subset=['text', 'label'])
             print(f"\nFinal dataset size: {len(df)} samples")
             
+            # Check minimum dataset size
+            MIN_SAMPLES = 10  # Minimum samples required for meaningful training
+            if len(df) < MIN_SAMPLES:
+                print(f"\nERROR: Insufficient data for training")
+                print(f"  Current: {len(df)} samples")
+                print(f"  Required: At least {MIN_SAMPLES} samples")
+                print("\nPlease:")
+                print("  1. Classify more emails (run classification)")
+                print("  2. Submit more feedback corrections")
+                print("  3. Run dataset_builder.py again")
+                return False
+            
             # Map labels to numeric (0=legitimate/safe, 1=phishing)
             label_mapping = {
                 'legitimate': 0,
@@ -142,6 +154,21 @@ class ModelRetrainer:
                 print(f"Unknown labels: {list(unique_labels)}")
                 df = df.dropna(subset=['label_numeric'])
                 print(f"Proceeding with {len(df)} valid samples")
+            
+            # Check minimum samples per class for stratified split
+            class_counts = df['label_numeric'].value_counts()
+            min_class_count = class_counts.min()
+            MIN_SAMPLES_PER_CLASS = 2  # Minimum for stratified split
+            
+            if min_class_count < MIN_SAMPLES_PER_CLASS:
+                print(f"\nERROR: Insufficient samples for stratified split")
+                print(f"  Class distribution:")
+                for label_val, count in class_counts.items():
+                    label_name = 'Legitimate' if label_val == 0 else 'Phishing'
+                    print(f"    {label_name}: {count} samples")
+                print(f"\n  Minimum required per class: {MIN_SAMPLES_PER_CLASS}")
+                print("\nPlease collect more diverse data (both phishing and legitimate emails)")
+                return False
             
             # Split data
             print(f"\nSplitting data (test size: {self.test_size*100:.0f}%)...")
