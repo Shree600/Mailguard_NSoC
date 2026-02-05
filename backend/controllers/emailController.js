@@ -86,8 +86,8 @@ exports.classifyEmails = async (req, res) => {
       }
     }
 
-    console.log('🎉 Classification complete!');
-
+    res.json({
+      success: true,
       message: `Successfully classified ${results.processed} emails`,
       stats: results
     });
