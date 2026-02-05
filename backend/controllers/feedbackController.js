@@ -18,17 +18,17 @@ const Email = require('../models/Email');
  */
 exports.submitFeedback = async (req, res) => {
   try {
-    const { emailId, correctLabel, notes } = req.body;
+    const { emailId, gmailId, correctLabel, notes } = req.body;
     const userId = req.mongoUserId; // From syncUserMiddleware
 
-    console.log(`📝 Feedback request received:`, { emailId, correctLabel, notes, userId });
+    console.log(`📝 Feedback request received:`, { emailId, gmailId, correctLabel, notes, userId });
 
-    // Validate required fields
-    if (!emailId || !correctLabel) {
-      console.log('❌ Validation failed: Missing emailId or correctLabel');
+    // Validate required fields - accept EITHER emailId OR gmailId
+    if ((!emailId && !gmailId) || !correctLabel) {
+      console.log('❌ Validation failed: Missing email identifier or correctLabel');
       return res.status(400).json({
         success: false,
-        error: 'emailId and correctLabel are required'
+        error: 'Either emailId or gmailId must be provided along with correctLabel'
       });
     }
 
@@ -41,10 +41,20 @@ exports.submitFeedback = async (req, res) => {
       });
     }
 
-    console.log(`📝 Processing feedback for email ${emailId} from user ${userId}`);
+    console.log(`📝 Processing feedback for email (emailId: ${emailId}, gmailId: ${gmailId}) from user ${userId}`);
 
-    // Check if email exists
-    const email = await Email.findById(emailId);
+    // Find email by either MongoDB _id or gmailId
+    let email;
+    if (emailId) {
+      // Lookup by MongoDB ObjectId
+      email = await Email.findById(emailId);
+      console.log(`🔍 Looked up by emailId: ${emailId}, found: ${!!email}`);
+    } else {
+      // Lookup by gmailId
+      email = await Email.findOne({ gmailId, userId }); // Include userId for security
+      console.log(`🔍 Looked up by gmailId: ${gmailId}, found: ${!!email}`);
+    }
+
     if (!email) {
       return res.status(404).json({
         success: false,
@@ -62,7 +72,7 @@ exports.submitFeedback = async (req, res) => {
     }
 
     // Get the classification for this email
-    const classification = await Classification.findOne({ emailId });
+    const classification = await Classification.findOne({ emailId: email._id });
     if (!classification) {
       return res.status(404).json({
         success: false,
@@ -77,7 +87,8 @@ exports.submitFeedback = async (req, res) => {
       : 'legitimate';
 
     // Check if feedback already exists (using compound unique index)
-    const existingFeedback = await Feedback.findOne({ emailId, userId });
+    // Always use email._id for consistency in database
+    const existingFeedback = await Feedback.findOne({ emailId: email._id, userId });
     if (existingFeedback) {
       // Update existing feedback
       existingFeedback.correctLabel = correctLabel;
@@ -87,7 +98,7 @@ exports.submitFeedback = async (req, res) => {
       
       await existingFeedback.save();
 
-      console.log(`✅ Updated existing feedback for email ${emailId}`);
+      console.log(`✅ Updated existing feedback for email ${email._id}`);
 
       return res.json({
         success: true,
@@ -103,9 +114,9 @@ exports.submitFeedback = async (req, res) => {
       });
     }
 
-    // Create new feedback entry
+    // Create new feedback entry (always use email._id)
     const feedback = new Feedback({
-      emailId,
+      emailId: email._id, // Use MongoDB _id for consistency
       userId,
       predictedLabel,
       correctLabel,
@@ -114,7 +125,7 @@ exports.submitFeedback = async (req, res) => {
 
     await feedback.save();
 
-    console.log(`✅ Feedback saved successfully for email ${emailId}`);
+    console.log(`✅ Feedback saved successfully for email ${email._id}`);
 
     // Return success response
     return res.status(201).json({
