@@ -44,10 +44,10 @@ exports.submitFeedback = async (req, res) => {
     if (emailId) {
       // Lookup by MongoDB ObjectId
       email = await Email.findById(emailId);
-      console.log(`🔍 Looked up by emailId: ${emailId}, found: ${!!email}`);
     } else {
       // Lookup by gmailId
       email = await Email.findOne({ gmailId, userId }); // Include userId for security
+    }
 
     if (!email) {
       return res.status(404).json({
@@ -58,8 +58,8 @@ exports.submitFeedback = async (req, res) => {
 
     // Check if email belongs to this user (security check)
     if (email.userId.toString() !== userId.toString()) {
-      console.log(`⚠️ UserId mismatch: email.userId=${email.userId.toString()}, req.mongoUserId=${userId.toString()}`);
       return res.status(403).json({
+        success: false,
         error: 'You can only provide feedback on your own emails'
       });
     }
@@ -91,8 +91,6 @@ exports.submitFeedback = async (req, res) => {
       
       await existingFeedback.save();
 
-      console.log(`✅ Updated existing feedback for email ${email._id}`);
-
       return res.json({
         success: true,
         message: 'Feedback updated successfully',
@@ -117,8 +115,6 @@ exports.submitFeedback = async (req, res) => {
     });
 
     await feedback.save();
-
-    console.log(`✅ Feedback saved successfully for email ${email._id}`);
 
     // Return success response
     return res.status(201).json({
