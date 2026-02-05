@@ -32,6 +32,7 @@ app.use(cors());
 
 // Import route modules
 // Note: Auth is now handled by Clerk, no local auth routes needed
+const healthRoutes = require('./routes/healthRoutes');
 const gmailRoutes = require('./routes/gmailRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
@@ -45,6 +46,9 @@ app.get('/', (req, res) => {
     message: 'Mailguard Backend API is running successfully!'
   });
 });
+
+// Mount health check routes (no auth required for monitoring)
+app.use('/health', healthRoutes);
 
 // Mount Gmail OAuth routes
 app.use('/api/gmail', gmailRoutes);
