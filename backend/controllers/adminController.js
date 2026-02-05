@@ -62,17 +62,16 @@ exports.triggerRetraining = async (req, res) => {
       });
       pythonProcess.on('close', (code) => {
         if (code === 0) {
-          console.log('✅ Dataset building completed successfully');
           resolve({ success: true, stdout, stderr, code });
         } else {
-          console.log(`❌ Dataset building failed with code ${code}`);
-          
+          reject({ success: false, stdout, stderr, code });
+        }
       });
       
       pythonProcess.on('error', (error) => {
-        console.log(`❌ Failed to start dataset builder: ${error.message}`);
         reject({ success: false, error: error.message });
-      })
+      });
+      
       setTimeout(() => {
         pythonProcess.kill();
         reject({ success: false, error: 'Dataset building timeout (2 minutes)' });
@@ -106,17 +105,14 @@ exports.triggerRetraining = async (req, res) => {
       // Handle completion
       pythonProcess.on('close', (code) => {
         if (code === 0) {
-          console.log('✅ Retraining completed successfully');
           resolve({ success: true, stdout, stderr, code });
         } else {
-          console.log(`❌ Retraining failed with code ${code}`);
           reject({ success: false, stdout, stderr, code });
         }
       });
       
       // Handle errors
       pythonProcess.on('error', (error) => {
-        console.log(`❌ Failed to start retraining: ${error.message}`);
         reject({ success: false, error: error.message });
       });
       // Set timeout (5 minutes max)
