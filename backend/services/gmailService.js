@@ -23,26 +23,52 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
     // Create authenticated Gmail client
     const gmail = getGmailClient(user.gmailAccessToken, user.gmailRefreshToken);
 
-    console.log(`📧 Fetching latest ${maxResults} emails for user: ${user.email}`);
+    console.log(`📧 Fetching up to ${maxResults} emails for user: ${user.email}`);
     console.log(`🔍 Using search query: "${searchQuery}"`);
 
-    // Step 1: List message IDs
-    const listResponse = await gmail.users.messages.list({
-      userId: 'me',
-      maxResults: maxResults,
-      q: searchQuery, // Use provided search query
-    });
+    // Step 1: List message IDs with pagination
+    let allMessages = [];
+    let pageToken = null;
+    let pageCount = 0;
+
+    do {
+      pageCount++;
+      console.log(`📄 Fetching page ${pageCount}...`);
+
+      const listResponse = await gmail.users.messages.list({
+        userId: 'me',
+        maxResults: 100, // Fetch 100 per page (Gmail API supports up to 500, but 100 is more reliable)
+        q: searchQuery,
+        pageToken: pageToken
+      });
+
+      // Add messages from this page
+      if (listResponse.data.messages && listResponse.data.messages.length > 0) {
+        allMessages = allMessages.concat(listResponse.data.messages);
+        console.log(`✅ Page ${pageCount}: Found ${listResponse.data.messages.length} emails (Total: ${allMessages.length})`);
+      }
+
+      // Get next page token
+      pageToken = listResponse.data.nextPageToken;
+
+      // Continue fetching all pages until no more pages exist
+      // Do NOT break early based on maxResults - fetch everything, then limit later
+
+    } while (pageToken); // Continue while there are more pages
 
     // Check if any messages exist
-    if (!listResponse.data.messages || listResponse.data.messages.length === 0) {
+    if (allMessages.length === 0) {
       console.log('📭 No emails found in Gmail inbox');
       return [];
     }
 
-    console.log(`✅ Found ${listResponse.data.messages.length} emails`);
+    console.log(`✅ Total emails found across ${pageCount} pages: ${allMessages.length}`);
+
+    // Limit to maxResults
+    const messagesToFetch = allMessages.slice(0, maxResults);
 
     // Step 2: Fetch full details for each message
-    const emailPromises = listResponse.data.messages.map(async (message) => {
+    const emailPromises = messagesToFetch.map(async (message) => {
       try {
         // Get full message details
         const messageDetails = await gmail.users.messages.get({
