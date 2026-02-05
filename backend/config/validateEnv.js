@@ -3,7 +3,7 @@
 
 const validateEnv = () => {
   const required = [
-    'MONGODB_URI',
+    'MONGO_URI',
     'CLERK_SECRET_KEY',
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
@@ -21,8 +21,8 @@ const validateEnv = () => {
   }
 
   // Check format of critical variables
-  if (process.env.MONGODB_URI && !process.env.MONGODB_URI.startsWith('mongodb')) {
-    warnings.push('MONGODB_URI should start with mongodb:// or mongodb+srv://');
+  if (process.env.MONGO_URI && !process.env.MONGO_URI.startsWith('mongodb')) {
+    warnings.push('MONGO_URI should start with mongodb:// or mongodb+srv://');
   }
 
   if (process.env.CLERK_SECRET_KEY && !process.env.CLERK_SECRET_KEY.startsWith('sk_')) {
