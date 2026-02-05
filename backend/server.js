@@ -19,9 +19,15 @@ connectDB();
 // Initialize Express app
 const app = express();
 
+// Import middleware
+const requestLogger = require('./middleware/requestLogger');
+
 // ================================================
 // MIDDLEWARE CONFIGURATION
 // ================================================
+
+// Request logging (minimal, production-safe)
+app.use(requestLogger);
 
 // Enable JSON parsing for incoming requests
 app.use(express.json());
