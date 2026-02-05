@@ -1,10 +1,14 @@
 # FastAPI ML Service for Phishing Detection
 # Main application entry point
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
+from typing import List
 import predictor  # Import predictor to load models at startup
+import traceback
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -21,6 +25,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Global exception handler for unexpected errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Catch-all exception handler to prevent service crashes.
+    Returns a structured error response for any unhandled exception.
+    """
+    print(f"❌ Unhandled exception: {str(exc)}")
+    print(traceback.format_exc())
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "detail": str(exc),
+            "type": type(exc).__name__
+        }
+    )
+
+
+# Validation error handler for request parsing errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Handle request validation errors with user-friendly messages.
+    """
+    print(f"❌ Validation error: {exc.errors()}")
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "Request validation failed",
+            "detail": exc.errors(),
+            "message": "Please check your request format and try again"
+        }
+    )
 
 
 # Request model for prediction
@@ -40,6 +82,26 @@ class PredictionResponse(BaseModel):
     prediction: str
     confidence: float
     probabilities: dict
+
+
+# Batch prediction request/response models
+class BatchPredictionRequest(BaseModel):
+    texts: List[str]
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "texts": [
+                    "Click here to win $1,000,000",
+                    "Meeting scheduled for tomorrow at 3pm"
+                ]
+            }
+        }
+
+
+class BatchPredictionResponse(BaseModel):
+    predictions: List[PredictionResponse]
+    count: int
 
 
 # Health check endpoint

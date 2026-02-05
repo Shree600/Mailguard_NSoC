@@ -31,9 +31,60 @@ def load_models():
         # Try to load existing models
         if os.path.exists(VECTORIZER_PATH) and os.path.exists(MODEL_PATH):
             print("📦 Loading existing models...")
-            vectorizer = joblib.load(VECTORIZER_PATH)
-            model = joblib.load(MODEL_PATH)
-            print("✅ Models loaded successfully from disk")
+            
+            # Validate file sizes (corrupted files are often 0 bytes or very small)
+            vectorizer_size = os.path.getsize(VECTORIZER_PATH)
+            model_size = os.path.getsize(MODEL_PATH)
+            
+            if vectorizer_size < 100:  # Less than 100 bytes is likely corrupted
+                raise RuntimeError(
+                    f"Vectorizer file appears corrupted (size: {vectorizer_size} bytes). "
+                    "Please retrain the model."
+                )
+            
+            if model_size < 100:
+                raise RuntimeError(
+                    f"Model file appears corrupted (size: {model_size} bytes). "
+                    "Please retrain the model."
+                )
+            
+            print(f"   Vectorizer: {vectorizer_size:,} bytes")
+            print(f"   Model: {model_size:,} bytes")
+            
+            # Try to load vectorizer with corruption detection
+            try:
+                vectorizer = joblib.load(VECTORIZER_PATH)
+                print("✅ Vectorizer loaded successfully")
+            except Exception as load_error:
+                raise RuntimeError(
+                    f"Failed to load vectorizer file (may be corrupted): {str(load_error)}. "
+                    "Please retrain the model."
+                )
+            
+            # Try to load model with corruption detection
+            try:
+                model = joblib.load(MODEL_PATH)
+                print("✅ Model loaded successfully")
+            except Exception as load_error:
+                raise RuntimeError(
+                    f"Failed to load model file (may be corrupted): {str(load_error)}. "
+                    "Please retrain the model."
+                )
+            
+            # Verify loaded objects are valid
+            if not hasattr(vectorizer, 'transform'):
+                raise RuntimeError(
+                    "Loaded vectorizer is invalid (missing 'transform' method). "
+                    "Please retrain the model."
+                )
+            
+            if not hasattr(model, 'predict'):
+                raise RuntimeError(
+                    "Loaded model is invalid (missing 'predict' method). "
+                    "Please retrain the model."
+                )
+            
+            print("✅ Models loaded and validated successfully")
             model_loaded = True
         else:
             # Create dummy models for testing
@@ -65,10 +116,15 @@ def load_models():
             print("   - phishing_model.pkl")
             model_loaded = True
             
-    except Exception as e:
-        print(f"❌ Error loading models: {str(e)}")
+    except RuntimeError:
+        # Re-raise RuntimeError as-is (already has good error message)
+        print(f"❌ Failed to load models")
         model_loaded = False
         raise
+    except Exception as e:
+        print(f"❌ Unexpected error loading models: {str(e)}")
+        model_loaded = False
+        raise RuntimeError(f"Failed to initialize ML models: {str(e)}")
 
 
 def reload_model():
@@ -105,24 +161,91 @@ def reload_model():
                 "loaded": model_loaded
             }
         
+        # Validate file sizes
+        vectorizer_size = os.path.getsize(VECTORIZER_PATH)
+        model_size = os.path.getsize(MODEL_PATH)
+        
+        if vectorizer_size < 100:
+            error_msg = f"Vectorizer file appears corrupted (size: {vectorizer_size} bytes)"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
+        
+        if model_size < 100:
+            error_msg = f"Model file appears corrupted (size: {model_size} bytes)"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
+        
         # Get file modification times for tracking
         vectorizer_mtime = os.path.getmtime(VECTORIZER_PATH)
         model_mtime = os.path.getmtime(MODEL_PATH)
         
         print(f"📦 Loading vectorizer from: {VECTORIZER_PATH}")
-        new_vectorizer = joblib.load(VECTORIZER_PATH)
+        print(f"   File size: {vectorizer_size:,} bytes")
+        
+        # Try to load vectorizer with corruption detection
+        try:
+            new_vectorizer = joblib.load(VECTORIZER_PATH)
+        except Exception as load_error:
+            error_msg = f"Failed to load vectorizer (may be corrupted): {str(load_error)}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
+        
         print("✅ Vectorizer loaded")
         
         print(f"📦 Loading model from: {MODEL_PATH}")
-        new_model = joblib.load(MODEL_PATH)
+        print(f"   File size: {model_size:,} bytes")
+        
+        # Try to load model with corruption detection
+        try:
+            new_model = joblib.load(MODEL_PATH)
+        except Exception as load_error:
+            error_msg = f"Failed to load model (may be corrupted): {str(load_error)}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
+        
         print("✅ Model loaded")
+        
+        # Verify loaded objects are valid
+        if not hasattr(new_vectorizer, 'transform'):
+            error_msg = "Loaded vectorizer is invalid (missing 'transform' method)"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
+        
+        if not hasattr(new_model, 'predict'):
+            error_msg = "Loaded model is invalid (missing 'predict' method)"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "loaded": model_loaded
+            }
         
         # Update global variables (atomic update)
         vectorizer = new_vectorizer
         model = new_model
         model_loaded = True
         
-        print("✅ Models reloaded successfully!")
+        print("✅ Models reloaded and validated successfully!")
         print("="*50 + "\n")
         
         return {
@@ -132,11 +255,13 @@ def reload_model():
             "vectorizer_updated": True,
             "model_updated": True,
             "vectorizer_mtime": vectorizer_mtime,
-            "model_mtime": model_mtime
+            "model_mtime": model_mtime,
+            "vectorizer_size": vectorizer_size,
+            "model_size": model_size
         }
         
     except Exception as e:
-        error_msg = f"Error reloading models: {str(e)}"
+        error_msg = f"Unexpected error reloading models: {str(e)}"
         print(f"❌ {error_msg}")
         print("="*50 + "\n")
         return {
