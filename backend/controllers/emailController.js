@@ -10,6 +10,7 @@ const User = require('../models/User');
 /**
  * Classify all unclassified emails using ML service
  * POST /api/emails/classify
+ * Optional body: { forceReclassify: boolean } - re-classify already classified emails
  */
 exports.classifyEmails = async (req, res) => {
   try {
@@ -24,20 +25,32 @@ exports.classifyEmails = async (req, res) => {
       });
     }
 
-    // Find all emails that haven't been classified yet
-    const classifiedEmailIds = await Classification.distinct('emailId');
-    const unclassifiedEmails = await Email.find({
-      _id: { $nin: classifiedEmailIds }
-    }).limit(100); // Process in batches
+    // Get forceReclassify flag from request body
+    const forceReclassify = req.body?.forceReclassify === true;
 
-    if (unclassifiedEmails.length === 0) {
+    // Find emails to classify
+    let emailsToClassify;
+    if (forceReclassify) {
+      // Re-classify ALL emails (useful after model retraining)
+      console.log('🔄 Force re-classifying ALL emails...');
+      emailsToClassify = await Email.find({}).limit(100);
+    } else {
+      // Only classify emails that haven't been classified yet
+      const classifiedEmailIds = await Classification.distinct('emailId');
+      emailsToClassify = await Email.find({
+        _id: { $nin: classifiedEmailIds }
+      }).limit(100); // Process in batches
+    }
+
+    if (emailsToClassify.length === 0) {
       return res.json({
         success: true,
-        message: 'No unclassified emails found',
+        message: 'No emails to classify',
         stats: {
           processed: 0,
           phishing: 0,
-          safe: 0
+          safe: 0,
+          updated: 0
         }
       });
     }
@@ -47,10 +60,11 @@ exports.classifyEmails = async (req, res) => {
       processed: 0,
       phishing: 0,
       safe: 0,
+      updated: 0, // Count of re-classifications
       errors: 0
     };
 
-    for (const email of unclassifiedEmails) {
+    for (const email of emailsToClassify) {
       try {
         // Combine subject and body for better classification
         const emailText = `${email.subject || ''} ${email.body || ''}`.trim();
@@ -64,13 +78,27 @@ exports.classifyEmails = async (req, res) => {
         console.log(`🤖 Classifying email: ${email.subject?.substring(0, 50) || 'No subject'}...`);
         const prediction = await mlService.predictEmail(emailText);
 
-        // Save classification to database
-        await Classification.create({
-          emailId: email._id,
-          prediction: prediction.prediction,
-          confidence: prediction.confidence,
-          probabilities: prediction.probabilities
-        });
+        // Save or update classification in database
+        // Use findOneAndUpdate with upsert to handle both new and existing classifications
+        const result = await Classification.findOneAndUpdate(
+          { emailId: email._id },
+          {
+            prediction: prediction.prediction,
+            confidence: prediction.confidence,
+            probabilities: prediction.probabilities,
+            createdAt: new Date() // Update timestamp
+          },
+          {
+            upsert: true, // Create if doesn't exist
+            new: true, // Return updated document
+            setDefaultsOnInsert: true
+          }
+        );
+
+        // Track if this was an update vs new classification
+        if (!result.isNew && forceReclassify) {
+          results.updated++;
+        }
 
         // Update stats
         results.processed++;
@@ -82,13 +110,24 @@ exports.classifyEmails = async (req, res) => {
 
       } catch (error) {
         console.error(`❌ Error classifying email ${email._id}:`, error.message);
+        
+        // Distinguish error types for better debugging
+        if (error.code === 11000) {
+          console.error('   Duplicate key error (should not happen with upsert)');
+        } else if (error.name === 'ValidationError') {
+          console.error('   Validation error:', error.message);
+        } else if (error.message?.includes('ML service')) {
+          console.error('   ML service error');
+        }
+        
         results.errors++;
       }
     }
 
     res.json({
       success: true,
-      message: `Successfully classified ${results.processed} emails`,
+      message: `Successfully classified ${results.processed} emails` + 
+               (results.updated > 0 ? ` (${results.updated} re-classified)` : ''),
       stats: results
     });
 
