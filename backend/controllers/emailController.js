@@ -299,7 +299,7 @@ exports.deleteEmail = async (req, res) => {
       });
     }
 
-    // Step 3: Delete from Gmail using Gmail API
+    // Step 3: Delete from Gmail using Gmail API (MUST succeed before DB deletion)
     try {
       await deleteGmailEmail(
         email.gmailId,
@@ -308,9 +308,15 @@ exports.deleteEmail = async (req, res) => {
       );
       console.log(`✅ Email deleted from Gmail: ${email.gmailId}`);
     } catch (gmailError) {
-      console.error(`⚠️  Gmail deletion failed: ${gmailError.message}`);
-      // Continue to delete from DB even if Gmail deletion fails
-      // (email might already be deleted from Gmail)
+      console.error(`❌ Gmail deletion failed: ${gmailError.message}`);
+      
+      // If Gmail deletion fails, do NOT delete from database
+      // Return error to user indicating the problem
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete email from Gmail. Database record preserved.',
+        details: gmailError.message
+      });
     }
 
     // Step 4: Delete associated classification
@@ -406,7 +412,7 @@ exports.bulkDeleteEmails = async (req, res) => {
 
     for (const email of emails) {
       try {
-        // Delete from Gmail
+        // Delete from Gmail (MUST succeed before DB deletion)
         try {
           await deleteGmailEmail(
             email.gmailId,
@@ -415,11 +421,14 @@ exports.bulkDeleteEmails = async (req, res) => {
           );
           console.log(`✅ Gmail deleted: ${email.gmailId}`);
         } catch (gmailError) {
-          console.error(`⚠️  Gmail deletion failed for ${email.gmailId}: ${gmailError.message}`);
+          console.error(`❌ Gmail deletion failed for ${email.gmailId}: ${gmailError.message}`);
           results.gmailErrors++;
-          // Continue to delete from DB even if Gmail deletion fails
+          results.failed++;
+          // Skip DB deletion if Gmail deletion fails
+          continue;
         }
 
+        // Only proceed if Gmail deletion succeeded
         // Delete classification
         await Classification.deleteOne({ emailId: email._id });
 
