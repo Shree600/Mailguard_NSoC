@@ -21,6 +21,7 @@ exports.triggerRetraining = async (req, res) => {
     
     // Configuration
     const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+    const DATASET_BUILDER_PATH = path.join(__dirname, '../../ml-service/dataset_builder.py');
     const RETRAIN_SCRIPT_PATH = path.join(__dirname, '../../ml-service/retrain.py');
     const TRAINING_DATA = req.body.dataFile || 'training.csv';
     const MODEL_TYPE = req.body.modelType || 'random_forest';
@@ -44,8 +45,57 @@ exports.triggerRetraining = async (req, res) => {
       });
     }
     
-    // Step 2: Run retraining script
-    console.log('\n🚀 Step 2: Starting model retraining...');
+    // Step 2: Build training dataset from feedback
+    console.log('\n📊 Step 2: Building training dataset from feedback...');
+    
+    const datasetResult = await new Promise((resolve, reject) => {
+      const args = [
+        DATASET_BUILDER_PATH,
+        '--output', TRAINING_DATA
+      ];
+      
+      console.log(`   Command: python ${args.join(' ')}`);
+      
+      const pythonProcess = spawn('python', args, {
+        cwd: path.join(__dirname, '../../ml-service')
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      pythonProcess.stdout.on('data', (data) => {
+        const text = data.toString();
+        stdout += text;
+        process.stdout.write(text);
+      });
+      
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      pythonProcess.on('close', (code) => {
+        if (code === 0) {
+          console.log('✅ Dataset building completed successfully');
+          resolve({ success: true, stdout, stderr, code });
+        } else {
+          console.log(`❌ Dataset building failed with code ${code}`);
+          reject({ success: false, stdout, stderr, code });
+        }
+      });
+      
+      pythonProcess.on('error', (error) => {
+        console.log(`❌ Failed to start dataset builder: ${error.message}`);
+        reject({ success: false, error: error.message });
+      });
+      
+      setTimeout(() => {
+        pythonProcess.kill();
+        reject({ success: false, error: 'Dataset building timeout (2 minutes)' });
+      }, 2 * 60 * 1000);
+    });
+    
+    // Step 3: Run retraining script
+    console.log('\n🚀 Step 3: Starting model retraining...');
     
     const retrainResult = await new Promise((resolve, reject) => {
       // Build command arguments
@@ -102,8 +152,8 @@ exports.triggerRetraining = async (req, res) => {
       }, 5 * 60 * 1000);
     });
     
-    // Step 3: Reload model in ML service
-    console.log('\n🔄 Step 3: Reloading model in ML service...');
+    // Step 4: Reload model in ML service
+    console.log('\n🔄 Step 4: Reloading model in ML service...');
     try {
       const reloadResponse = await axios.post(
         `${ML_SERVICE_URL}/reload`,
@@ -134,6 +184,7 @@ exports.triggerRetraining = async (req, res) => {
       success: true,
       message: 'Model retrained and reloaded successfully',
       steps: {
+        datasetBuilding: 'completed',
         retraining: 'completed',
         reload: 'completed'
       },
