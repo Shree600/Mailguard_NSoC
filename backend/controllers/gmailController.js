@@ -236,8 +236,6 @@ const fetchAndSaveEmails = async (req, res) => {
     // Validate maxResults (ignored if fetchAll is true)
     const validatedMax = fetchAll ? 500 : Math.min(Math.max(parseInt(maxResults), 1), 100); // Between 1 and 100, or 500 for fetchAll
     
-    console.log(`📋 Fetch params: fetchAll=${fetchAll}, maxResults=${validatedMax}, dateFrom=${dateFrom || 'none'}, dateTo=${dateTo || 'none'}, query="${query}"`);
-
     // Get user from database
     const user = await User.findById(userId);
 
@@ -257,9 +255,6 @@ const fetchAndSaveEmails = async (req, res) => {
       });
     }
 
-    console.log(`\n📧 Starting email fetch for user: ${user.email}`);
-    console.log(`   Fetching up to ${validatedMax} emails...\n`);
-
     // Build Gmail search query
     let gmailSearchQuery = 'in:inbox';
     
@@ -278,8 +273,6 @@ const fetchAndSaveEmails = async (req, res) => {
       gmailSearchQuery += ` ${query}`;
     }
     
-    console.log(`🔍 Gmail search query: "${gmailSearchQuery}"\n`);
-
     // Fetch emails from Gmail using service
     const fetchedEmails = await fetchEmails(user, validatedMax, gmailSearchQuery);
 
@@ -302,8 +295,6 @@ const fetchAndSaveEmails = async (req, res) => {
     let errorCount = 0;
 
     // Process and save each email
-    console.log(`\n💾 Saving emails to database...\n`);
-
     for (const fetchedEmail of fetchedEmails) {
       try {
         // Prepare email document
@@ -322,28 +313,18 @@ const fetchAndSaveEmails = async (req, res) => {
         // Try to save email (will fail if duplicate gmailId exists)
         const email = new Email(emailDoc);
         await email.save();
-
         savedCount++;
-        console.log(`   ✅ Saved: "${fetchedEmail.subject.substring(0, 50)}..."`);
 
       } catch (error) {
         // Check if it's a duplicate key error
         if (error.code === 11000) {
           duplicateCount++;
-          console.log(`   ⏭️  Duplicate: "${fetchedEmail.subject.substring(0, 50)}..."`);
         } else {
           errorCount++;
           console.error(`   ❌ Error saving: ${error.message}`);
         }
       }
     }
-
-    console.log(`\n📊 Fetch Summary:`);
-    console.log(`   Total fetched from Gmail: ${fetchedEmails.length}`);
-    console.log(`   ✅ New emails saved: ${savedCount}`);
-    console.log(`   ⏭️  Already in database: ${duplicateCount}`);
-    console.log(`   ❌ Errors: ${errorCount}`);
-    console.log(`   📧 Total in your database: ${await Email.countDocuments({ userId: user._id })}\n`);
 
     // Return success response with refetch suggestion
     const totalInDb = await Email.countDocuments({ userId: user._id });

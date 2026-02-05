@@ -42,8 +42,6 @@ exports.classifyEmails = async (req, res) => {
       });
     }
 
-    console.log(`📧 Found ${unclassifiedEmails.length} unclassified emails`);
-
     // Classify each email
     const results = {
       processed: 0,
@@ -82,8 +80,6 @@ exports.classifyEmails = async (req, res) => {
           results.safe++;
         }
 
-        console.log(`✅ Classified as: ${prediction.prediction} (confidence: ${(prediction.confidence * 100).toFixed(1)}%)`);
-
       } catch (error) {
         console.error(`❌ Error classifying email ${email._id}:`, error.message);
         results.errors++;
@@ -92,8 +88,6 @@ exports.classifyEmails = async (req, res) => {
 
     console.log('🎉 Classification complete!');
 
-    res.json({
-      success: true,
       message: `Successfully classified ${results.processed} emails`,
       stats: results
     });

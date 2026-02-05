@@ -26,18 +26,10 @@ exports.triggerRetraining = async (req, res) => {
     const TRAINING_DATA = req.body.dataFile || 'training.csv';
     const MODEL_TYPE = req.body.modelType || 'random_forest';
     
-    console.log(`📊 Configuration:`);
-    console.log(`   ML Service: ${ML_SERVICE_URL}`);
-    console.log(`   Training data: ${TRAINING_DATA}`);
-    console.log(`   Model type: ${MODEL_TYPE}`);
-    
     // Step 1: Check if ML service is available
-    console.log('\n🔍 Step 1: Checking ML service availability...');
     try {
       await axios.get(`${ML_SERVICE_URL}/health`, { timeout: 5000 });
-      console.log('✅ ML service is available');
     } catch (error) {
-      console.log('❌ ML service is not available');
       return res.status(503).json({
         success: false,
         error: 'ML service is not available. Please start it first.',
@@ -46,15 +38,11 @@ exports.triggerRetraining = async (req, res) => {
     }
     
     // Step 2: Build training dataset from feedback
-    console.log('\n📊 Step 2: Building training dataset from feedback...');
-    
     const datasetResult = await new Promise((resolve, reject) => {
       const args = [
         DATASET_BUILDER_PATH,
         '--output', TRAINING_DATA
       ];
-      
-      console.log(`   Command: python ${args.join(' ')}`);
       
       const pythonProcess = spawn('python', args, {
         cwd: path.join(__dirname, '../../ml-service')
@@ -72,22 +60,19 @@ exports.triggerRetraining = async (req, res) => {
       pythonProcess.stderr.on('data', (data) => {
         stderr += data.toString();
       });
-      
       pythonProcess.on('close', (code) => {
         if (code === 0) {
           console.log('✅ Dataset building completed successfully');
           resolve({ success: true, stdout, stderr, code });
         } else {
           console.log(`❌ Dataset building failed with code ${code}`);
-          reject({ success: false, stdout, stderr, code });
-        }
+          
       });
       
       pythonProcess.on('error', (error) => {
         console.log(`❌ Failed to start dataset builder: ${error.message}`);
         reject({ success: false, error: error.message });
-      });
-      
+      })
       setTimeout(() => {
         pythonProcess.kill();
         reject({ success: false, error: 'Dataset building timeout (2 minutes)' });
@@ -98,17 +83,7 @@ exports.triggerRetraining = async (req, res) => {
     console.log('\n🚀 Step 3: Starting model retraining...');
     
     const retrainResult = await new Promise((resolve, reject) => {
-      // Build command arguments
-      const args = [
-        RETRAIN_SCRIPT_PATH,
-        '--data', TRAINING_DATA,
-        '--model', MODEL_TYPE
-      ];
-      
-      console.log(`   Command: python ${args.join(' ')}`);
-      
-      // Spawn Python process
-      const pythonProcess = spawn('python', args, {
+      //t retrainResult = await new Promise((resolve, reject) => {
         cwd: path.join(__dirname, '../../ml-service')
       });
       
@@ -144,18 +119,15 @@ exports.triggerRetraining = async (req, res) => {
         console.log(`❌ Failed to start retraining: ${error.message}`);
         reject({ success: false, error: error.message });
       });
-      
       // Set timeout (5 minutes max)
-      setTimeout(() => {
-        pythonProcess.kill();
+      setTthonProcess.kill();
         reject({ success: false, error: 'Retraining timeout (5 minutes)' });
       }, 5 * 60 * 1000);
     });
     
     // Step 4: Reload model in ML service
     console.log('\n🔄 Step 4: Reloading model in ML service...');
-    try {
-      const reloadResponse = await axios.post(
+    try nst reloadResponse = await axios.post(
         `${ML_SERVICE_URL}/reload`,
         {},
         { timeout: 10000 }

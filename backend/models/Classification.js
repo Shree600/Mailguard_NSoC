@@ -45,12 +45,9 @@ const classificationSchema = new mongoose.Schema({
   }
 });
 
-// Index for faster queries
-classificationSchema.index({ emailId: 1 });
+// Indexes for faster queries
+classificationSchema.index({ emailId: 1 }, { unique: true }); // Prevent duplicates
 classificationSchema.index({ prediction: 1 });
 classificationSchema.index({ createdAt: -1 });
-
-// Prevent duplicate classifications for same email
-classificationSchema.index({ emailId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Classification', classificationSchema);

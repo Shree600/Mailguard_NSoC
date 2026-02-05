@@ -21,11 +21,8 @@ exports.submitFeedback = async (req, res) => {
     const { emailId, gmailId, correctLabel, notes } = req.body;
     const userId = req.mongoUserId; // From syncUserMiddleware
 
-    console.log(`📝 Feedback request received:`, { emailId, gmailId, correctLabel, notes, userId });
-
     // Validate required fields - accept EITHER emailId OR gmailId
     if ((!emailId && !gmailId) || !correctLabel) {
-      console.log('❌ Validation failed: Missing email identifier or correctLabel');
       return res.status(400).json({
         success: false,
         error: 'Either emailId or gmailId must be provided along with correctLabel'
@@ -34,7 +31,6 @@ exports.submitFeedback = async (req, res) => {
 
     // Validate correctLabel value
     if (!['phishing', 'legitimate'].includes(correctLabel)) {
-      console.log(`❌ Validation failed: Invalid correctLabel "${correctLabel}"`);
       return res.status(400).json({
         success: false,
         error: 'correctLabel must be either "phishing" or "legitimate"'
@@ -52,8 +48,6 @@ exports.submitFeedback = async (req, res) => {
     } else {
       // Lookup by gmailId
       email = await Email.findOne({ gmailId, userId }); // Include userId for security
-      console.log(`🔍 Looked up by gmailId: ${gmailId}, found: ${!!email}`);
-    }
 
     if (!email) {
       return res.status(404).json({
@@ -66,7 +60,6 @@ exports.submitFeedback = async (req, res) => {
     if (email.userId.toString() !== userId.toString()) {
       console.log(`⚠️ UserId mismatch: email.userId=${email.userId.toString()}, req.mongoUserId=${userId.toString()}`);
       return res.status(403).json({
-        success: false,
         error: 'You can only provide feedback on your own emails'
       });
     }
