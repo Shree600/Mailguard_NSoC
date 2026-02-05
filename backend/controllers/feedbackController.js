@@ -79,54 +79,43 @@ exports.submitFeedback = async (req, res) => {
       ? 'phishing' 
       : 'legitimate';
 
-    // Check if feedback already exists (using compound unique index)
-    // Always use email._id for consistency in database
-    const existingFeedback = await Feedback.findOne({ emailId: email._id, userId });
-    if (existingFeedback) {
-      // Update existing feedback
-      existingFeedback.correctLabel = correctLabel;
-      existingFeedback.predictedLabel = predictedLabel;
-      if (notes) existingFeedback.notes = notes;
-      existingFeedback.usedInTraining = false; // Reset training flag
-      
-      await existingFeedback.save();
+    // Use findOneAndUpdate with upsert for atomic operation
+    // This prevents race conditions and handles both create and update in one operation
+    const feedback = await Feedback.findOneAndUpdate(
+      { 
+        emailId: email._id, 
+        userId 
+      },
+      {
+        predictedLabel,
+        correctLabel,
+        notes: notes || undefined,
+        usedInTraining: false // Reset training flag on update
+      },
+      {
+        upsert: true, // Create if doesn't exist
+        new: true, // Return updated document
+        runValidators: true, // Run schema validations
+        setDefaultsOnInsert: true // Set default values on insert
+      }
+    );
 
-      return res.json({
-        success: true,
-        message: 'Feedback updated successfully',
-        feedback: {
-          id: existingFeedback._id,
-          emailId: existingFeedback.emailId,
-          predictedLabel: existingFeedback.predictedLabel,
-          correctLabel: existingFeedback.correctLabel,
-          wasCorrect: existingFeedback.isPredictionCorrect(),
-          updatedAt: existingFeedback.updatedAt
-        }
-      });
-    }
-
-    // Create new feedback entry (always use email._id)
-    const feedback = new Feedback({
-      emailId: email._id, // Use MongoDB _id for consistency
-      userId,
-      predictedLabel,
-      correctLabel,
-      notes: notes || undefined
-    });
-
-    await feedback.save();
+    // Determine if this was an update or new feedback
+    const isUpdate = feedback.updatedAt && 
+                     (Date.now() - feedback.updatedAt.getTime() < 1000);
 
     // Return success response
-    return res.status(201).json({
+    return res.status(isUpdate ? 200 : 201).json({
       success: true,
-      message: 'Feedback submitted successfully',
+      message: isUpdate ? 'Feedback updated successfully' : 'Feedback submitted successfully',
       feedback: {
         id: feedback._id,
         emailId: feedback.emailId,
         predictedLabel: feedback.predictedLabel,
         correctLabel: feedback.correctLabel,
         wasCorrect: feedback.isPredictionCorrect(),
-        createdAt: feedback.createdAt
+        createdAt: feedback.createdAt,
+        updatedAt: feedback.updatedAt
       }
     });
 
