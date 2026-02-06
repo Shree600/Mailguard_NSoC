@@ -55,10 +55,19 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
     let allMessages = [];
     let pageToken = null;
     let pageCount = 0;
+    const MAX_PAGES = 50; // Safety limit: 50 pages * 100 = 5000 message IDs max
 
     do {
       pageCount++;
-      console.log(`📄 Fetching page ${pageCount}...`);
+      console.log(`📄 Fetching page ${pageCount}/${MAX_PAGES}...`);
+
+      // PRODUCTION SAFETY: Stop if we've fetched too many pages
+      // Prevents memory exhaustion and excessive API calls
+      if (pageCount > MAX_PAGES) {
+        console.warn(`⚠️  Reached max page limit (${MAX_PAGES}). Stopping pagination.`);
+        console.warn(`   Total messages collected: ${allMessages.length}`);
+        break;
+      }
 
       const listResponse = await gmail.users.messages.list({
         userId: 'me',
@@ -71,13 +80,20 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
       if (listResponse.data.messages && listResponse.data.messages.length > 0) {
         allMessages = allMessages.concat(listResponse.data.messages);
         console.log(`✅ Page ${pageCount}: Found ${listResponse.data.messages.length} emails (Total: ${allMessages.length})`);
+      } else {
+        console.log(`📭 Page ${pageCount}: No messages found, stopping pagination.`);
+        break; // No more messages, exit loop
       }
 
       // Get next page token
       pageToken = listResponse.data.nextPageToken;
 
-      // Continue fetching all pages until no more pages exist
-      // Do NOT break early based on maxResults - fetch everything, then limit later
+      // RATE LIMITING: Add small delay between pages to avoid hitting Gmail API limits
+      // Gmail allows 250 quota units per user per second (list = 5 units)
+      // Adding 100ms delay = max 10 requests/sec = 50 quota units/sec (well under limit)
+      if (pageToken) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
     } while (pageToken); // Continue while there are more pages
 
@@ -89,36 +105,67 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
 
     console.log(`✅ Total emails found across ${pageCount} pages: ${allMessages.length}`);
 
-    // Limit to maxResults
+    // Limit to maxResults AFTER pagination (prevents refetching pages)
     const messagesToFetch = allMessages.slice(0, maxResults);
+    console.log(`📥 Fetching full details for ${messagesToFetch.length} emails...`);
 
     // Step 2: Fetch full details for each message
-    const emailPromises = messagesToFetch.map(async (message) => {
-      try {
-        // Get full message details
-        const messageDetails = await gmail.users.messages.get({
-          userId: 'me',
-          id: message.id,
-          format: 'full', // Get full message including body
-        });
+    // CRITICAL: Do NOT use Promise.all with hundreds of requests - it will hit rate limits!
+    // Instead, process in batches with delays between batches
+    const BATCH_SIZE = 10; // Process 10 emails at a time
+    const BATCH_DELAY = 200; // 200ms delay between batches
+    const validEmails = [];
+    let failedCount = 0;
 
-        // Parse the email
-        const parsedEmail = parseGmailMessage(messageDetails.data);
-        
-        return parsedEmail;
-      } catch (error) {
-        console.error(`❌ Error fetching message ${message.id}:`, error.message);
-        return null; // Skip this email if fetch fails
+    for (let i = 0; i < messagesToFetch.length; i += BATCH_SIZE) {
+      const batch = messagesToFetch.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(messagesToFetch.length / BATCH_SIZE);
+      
+      console.log(`   Batch ${batchNumber}/${totalBatches}: Processing ${batch.length} emails...`);
+
+      // Process this batch in parallel
+      const batchPromises = batch.map(async (message) => {
+        try {
+          // Get full message details
+          const messageDetails = await gmail.users.messages.get({
+            userId: 'me',
+            id: message.id,
+            format: 'full', // Get full message including body
+          });
+
+          // Parse the email
+          const parsedEmail = parseGmailMessage(messageDetails.data);
+          
+          return parsedEmail;
+        } catch (error) {
+          console.error(`   ❌ Error fetching message ${message.id}:`, error.message);
+          return null; // Skip this email if fetch fails
+        }
+      });
+
+      // Wait for this batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Add successful results to validEmails
+      batchResults.forEach(email => {
+        if (email !== null) {
+          validEmails.push(email);
+        } else {
+          failedCount++;
+        }
+      });
+
+      // Add delay between batches to avoid rate limits (except for last batch)
+      if (i + BATCH_SIZE < messagesToFetch.length) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
       }
-    });
-
-    // Wait for all emails to be fetched
-    const emails = await Promise.all(emailPromises);
-
-    // Filter out any null values (failed fetches)
-    const validEmails = emails.filter(email => email !== null);
+    }
 
     console.log(`✅ Successfully parsed ${validEmails.length} emails`);
+    if (failedCount > 0) {
+      console.warn(`⚠️  Failed to fetch ${failedCount} emails (skipped)`);
+    }
 
     return validEmails;
 
