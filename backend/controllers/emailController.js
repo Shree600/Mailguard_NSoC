@@ -122,15 +122,6 @@ exports.classifyEmails = async (req, res) => {
         }
       }
 
-    } catch (error) {
-      // Handle batch prediction errors
-      console.error(`❌ Batch classification error:`, error.message);
-      return res.status(503).json({
-        error: 'ML service error',
-        message: error.message
-      });
-    }
-
     res.json({
       success: true,
       message: `Successfully classified ${results.processed} emails` + 

@@ -1,6 +1,7 @@
 // Import required packages
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const validateEnv = require('./config/validateEnv');
@@ -26,6 +27,9 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 // ================================================
 // MIDDLEWARE CONFIGURATION
 // ================================================
+
+// Security headers (XSS, clickjacking protection, etc.)
+app.use(helmet());
 
 // Request logging (minimal, production-safe)
 app.use(requestLogger);
