@@ -4,19 +4,30 @@
  */
 
 import { UserButton, useUser } from '@clerk/clerk-react'
-import { Bell, Search } from 'lucide-react'
+import { Bell, Search, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-export default function Header() {
+export default function Header({ onMenuClick }) {
   const { user } = useUser()
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'User'
 
   return (
     <header className="h-16 border-b border-gray-200 bg-white sticky top-0 z-30">
-      <div className="h-full flex items-center justify-between px-6">
-        {/* Left side - Search */}
-        <div className="flex items-center gap-4 flex-1 max-w-md">
-          <div className="relative flex-1">
+      <div className="h-full flex items-center justify-between px-4 sm:px-6">
+        {/* Left side - Mobile menu + Search */}
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 max-w-md">
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onMenuClick}
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+
+          {/* Search - hidden on small mobile */}
+          <div className="relative flex-1 hidden xs:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"

@@ -548,43 +548,43 @@ function Dashboard() {
       )}
 
       {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
           Welcome back, {displayName}! 👋
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm sm:text-base text-gray-600">
           Here's your email security overview
         </p>
       </div>
         
         {/* Gmail Connection Section */}
-        <div className="mb-8 bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-700 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-gray-800 rounded-lg border border-gray-700">
-                <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+        <div className="mb-8 bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-700 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <div className="p-2 sm:p-3 bg-gray-800 rounded-lg border border-gray-700 flex-shrink-0">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
                 </svg>
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-xl font-semibold text-white">Gmail Integration</h3>
+                  <h3 className="text-lg sm:text-xl font-semibold text-white">Gmail Integration</h3>
                   {gmailConnected && (
-                    <span className="px-3 py-1 bg-green-600/20 border border-green-500/50 rounded-full text-xs text-green-300 font-semibold">
+                    <span className="px-2 sm:px-3 py-1 bg-green-600/20 border border-green-500/50 rounded-full text-xs text-green-300 font-semibold">
                       ✓ Connected
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-300">
+                <p className="text-xs sm:text-sm text-gray-300">
                   {gmailConnected ? 'Fetch and scan your emails for phishing threats' : 'Connect your Gmail to scan and protect your inbox'}
                 </p>
               </div>
             </div>
-            <div className="flex space-x-4">
+            <div className="flex flex-wrap gap-2 sm:gap-4 w-full sm:w-auto">
               {!gmailConnected ? (
                 <button
                   onClick={handleConnectGmail}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-200 flex items-center space-x-2"
+                  className="flex-1 sm:flex-none px-4 sm:px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-200 flex items-center justify-center space-x-2 min-h-[44px] text-sm sm:text-base"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -595,7 +595,7 @@ function Dashboard() {
                 <>
                   <button
                     onClick={() => setShowFetchOptions(!showFetchOptions)}
-                    className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition duration-200 flex items-center space-x-2"
+                    className="flex-1 sm:flex-none px-4 sm:px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 min-h-[44px] text-sm sm:text-base"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -605,7 +605,7 @@ function Dashboard() {
                   <button
                     onClick={handleFetchEmails}
                     disabled={fetchingEmails}
-                    className={`px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 ${
+                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 min-h-[44px] text-sm sm:text-base ${
                       fetchingEmails
                         ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                         : 'bg-green-600 hover:bg-green-700 text-white'
@@ -617,14 +617,16 @@ function Dashboard() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Fetching...</span>
+                        <span className="hidden sm:inline">Fetching...</span>
+                        <span className="sm:hidden">...</span>
                       </>
                     ) : (
                       <>
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                        <span>Fetch & Scan</span>
+                        <span className="hidden sm:inline">Fetch & Scan</span>
+                        <span className="sm:hidden">Fetch</span>
                       </>
                     )}
                   </button>
@@ -951,32 +953,34 @@ function Dashboard() {
         </div>
 
         {/* Action Buttons */}
-        <div className="mb-6 flex flex-wrap gap-4">
+        <div className="mb-6 flex flex-wrap gap-3 sm:gap-4">
           {/* Bulk Delete Button */}
           <button
             onClick={handleBulkDelete}
             disabled={selectedEmails.length === 0}
-            className={`px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 ${
+            className={`px-4 sm:px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 min-h-[44px] text-sm sm:text-base ${
               selectedEmails.length > 0
                 ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            <span>Delete Selected ({selectedEmails.length})</span>
+            <span className="hidden sm:inline">Delete Selected ({selectedEmails.length})</span>
+            <span className="sm:hidden">Delete ({selectedEmails.length})</span>
           </button>
 
           {/* Clean All Phishing Button */}
           <button
             onClick={handleCleanPhishing}
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition duration-200 flex items-center space-x-2"
+            className="px-4 sm:px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition duration-200 flex items-center space-x-2 min-h-[44px] text-sm sm:text-base"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span>🧹 Clean All Phishing</span>
+            <span className="hidden sm:inline">🧹 Clean All Phishing</span>
+            <span className="sm:hidden">🧹 Clean</span>
           </button>
         </div>
 

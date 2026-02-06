@@ -39,19 +39,26 @@ const menuItems = [
   },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
 
   return (
     <>
-      {/* Mobile overlay */}
-      <div className="lg:hidden fixed inset-0 bg-black/50 z-40" />
+      {/* Mobile overlay - only show when menu is open */}
+      {isOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-40" 
+          onClick={onClose}
+        />
+      )}
       
       {/* Sidebar */}
       <aside
         className={cn(
           "fixed left-0 top-0 z-50 h-screen bg-white border-r border-gray-200 transition-all duration-300",
+          "lg:translate-x-0", // Always visible on large screens
+          isOpen ? "translate-x-0" : "-translate-x-full", // Toggle on mobile
           collapsed ? "w-16" : "w-64"
         )}
       >
