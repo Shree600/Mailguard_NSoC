@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const validateEnv = require('./config/validateEnv');
@@ -30,6 +31,12 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 
 // Security headers (XSS, clickjacking protection, etc.)
 app.use(helmet());
+
+// Gzip compression for API responses (reduces bandwidth by ~70-90%)
+app.use(compression({ 
+  threshold: 1024, // Only compress responses > 1KB
+  level: 6 // Compression level (0-9, 6 is balanced)
+}));
 
 // Request logging (minimal, production-safe)
 app.use(requestLogger);
