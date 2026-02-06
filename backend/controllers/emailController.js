@@ -14,6 +14,7 @@ const User = require('../models/User');
  */
 exports.classifyEmails = async (req, res) => {
   try {
+    const userId = req.mongoUserId; // From syncUserMiddleware
     console.log('📊 Starting email classification...');
 
     // Check if ML service is available
@@ -28,16 +29,17 @@ exports.classifyEmails = async (req, res) => {
     // Get forceReclassify flag from request body
     const forceReclassify = req.body?.forceReclassify === true;
 
-    // Find emails to classify
+    // Find emails to classify (ONLY user's emails for security)
     let emailsToClassify;
     if (forceReclassify) {
-      // Re-classify ALL emails (useful after model retraining)
-      console.log('🔄 Force re-classifying ALL emails...');
-      emailsToClassify = await Email.find({}).limit(100);
+      // Re-classify user's emails (useful after model retraining)
+      console.log('🔄 Force re-classifying user emails...');
+      emailsToClassify = await Email.find({ userId }).limit(100);
     } else {
-      // Only classify emails that haven't been classified yet
+      // Only classify user's emails that haven't been classified yet
       const classifiedEmailIds = await Classification.distinct('emailId');
       emailsToClassify = await Email.find({
+        userId, // Security: only classify user's own emails
         _id: { $nin: classifiedEmailIds }
       }).limit(100); // Process in batches
     }

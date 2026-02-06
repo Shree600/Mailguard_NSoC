@@ -35,6 +35,13 @@ const userSchema = new mongoose.Schema(
       trim: true, // Removes whitespace from both ends
     },
 
+    // User role for authorization (admin, user)
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
+
     // ================================================
     // GMAIL OAUTH INTEGRATION FIELDS
     // ================================================
