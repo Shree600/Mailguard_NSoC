@@ -40,7 +40,8 @@ async function predictEmail(text) {
     return {
       prediction: result.prediction,
       confidence: result.confidence,
-      probabilities: result.probabilities
+      probabilities: result.probabilities,
+      modelVersion: result.model_version || 'unknown'  // Include version from ML service
     };
 
   } catch (error) {
