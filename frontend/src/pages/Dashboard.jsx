@@ -8,6 +8,8 @@ import { useUser, useClerk } from '@clerk/clerk-react'
 import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus } from '../services/api'
 import EmailTable from '../components/EmailTable'
 import EmailStatsChart from '../components/EmailStatsChart'
+import StatsCard from '../components/StatsCard'
+import { Mail, ShieldAlert, CheckCircle2, HardDrive } from 'lucide-react'
 
 function Dashboard() {
   const { user } = useUser()
@@ -701,88 +703,42 @@ function Dashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {/* Total Emails Card */}
-          <div className="bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-800 p-6 hover:border-gray-700 transition duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gray-800 rounded-lg">
-                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-          {statsLoading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-800 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-800 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <h3 className="text-2xl font-bold text-white mb-1">{stats.total}</h3>
-                <p className="text-gray-400 text-sm">Total Emails</p>
-              </>
-            )}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatsCard
+            title="Total Emails"
+            value={stats.total}
+            icon={Mail}
+            loading={statsLoading}
+            iconColor="text-blue-600"
+            iconBgColor="bg-blue-50"
+          />
 
-          {/* Phishing Detected Card */}
-          <div className="bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-800 p-6 hover:border-gray-700 transition duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gray-800 rounded-lg">
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-            </div>
-            {statsLoading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-800 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-800 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <h3 className="text-2xl font-bold text-red-400 mb-1">{stats.phishing}</h3>
-                <p className="text-gray-400 text-sm">Phishing Detected</p>
-              </>
-            )}
-          </div>
+          <StatsCard
+            title="Phishing Detected"
+            value={stats.phishing}
+            icon={ShieldAlert}
+            loading={statsLoading}
+            iconColor="text-red-600"
+            iconBgColor="bg-red-50"
+          />
 
-          {/* Safe Emails Card */}
-          <div className="bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-800 p-6 hover:border-gray-700 transition duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gray-800 rounded-lg">
-                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-            {statsLoading ? (
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-800 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-800 rounded w-24"></div>
-              </div>
-            ) : (
-              <>
-                <h3 className="text-2xl font-bold text-green-400 mb-1">{stats.safe}</h3>
-                <p className="text-gray-400 text-sm">Safe Emails</p>
-              </>
-            )}
-          </div>
-          
-          {/* Storage Saved Card */}
-          <div className="bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-800 p-6 hover:border-gray-700 transition duration-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gray-800 rounded-lg">
-                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-1">{storageSaved.mbSaved.toFixed(2)} MB</h3>
-            <p className="text-gray-400 text-sm">Storage Saved</p>
-            <p className="text-xs text-gray-500 mt-2">
-              🗑️ {storageSaved.emailsDeleted} emails cleaned
-            </p>
-          </div>
+          <StatsCard
+            title="Safe Emails"
+            value={stats.safe}
+            icon={CheckCircle2}
+            loading={statsLoading}
+            iconColor="text-green-600"
+            iconBgColor="bg-green-50"
+          />
+
+          <StatsCard
+            title="Storage Saved"
+            value={`${storageSaved.mbSaved.toFixed(2)} MB`}
+            icon={HardDrive}
+            loading={statsLoading}
+            iconColor="text-purple-600"
+            iconBgColor="bg-purple-50"
+          />
         </div>
 
         {/* Error Message */}
