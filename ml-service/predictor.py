@@ -4,6 +4,8 @@
 import os
 import joblib
 import numpy as np
+import json  # NEW: For metadata loading
+from datetime import datetime  # NEW: For timestamps
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 import warnings
@@ -14,10 +16,12 @@ warnings.filterwarnings('ignore')
 vectorizer = None
 model = None
 model_loaded = False
+model_metadata = None  # NEW: Store model metadata
 
 # Model file paths
 VECTORIZER_PATH = os.path.join(os.path.dirname(__file__), "vectorizer.pkl")
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "phishing_model.pkl")
+METADATA_PATH = os.path.join(os.path.dirname(__file__), "model_metadata.json")  # NEW
 
 
 def load_models():
@@ -25,7 +29,7 @@ def load_models():
     Load the TF-IDF vectorizer and phishing detection model.
     If files don't exist, create dummy models for testing.
     """
-    global vectorizer, model, model_loaded
+    global vectorizer, model, model_loaded, model_metadata
     
     try:
         # Try to load existing models
@@ -84,6 +88,25 @@ def load_models():
                     "Please retrain the model."
                 )
             
+            # NEW: Load model metadata if available
+            if os.path.exists(METADATA_PATH):
+                try:
+                    with open(METADATA_PATH, 'r') as f:
+                        model_metadata = json.load(f)
+                    print(f"✅ Model metadata loaded (version: {model_metadata.get('version', 'unknown')})")
+                except Exception as meta_error:
+                    print(f"⚠️  Warning: Could not load metadata: {meta_error}")
+                    model_metadata = {"version": "unknown", "warning": "Metadata file corrupted"}
+            else:
+                print("⚠️  Warning: No metadata file found (model_metadata.json)")
+                # Create default metadata based on file mtime
+                model_mtime = os.path.getmtime(MODEL_PATH)
+                model_metadata = {
+                    "version": datetime.fromtimestamp(model_mtime).strftime("%Y%m%d_%H%M%S"),
+                    "trained_at": datetime.fromtimestamp(model_mtime).isoformat(),
+                    "warning": "Metadata file missing - version inferred from file timestamp"
+                }
+            
             print("✅ Models loaded and validated successfully")
             model_loaded = True
         else:
@@ -110,10 +133,19 @@ def load_models():
             model = MultinomialNB()
             model.fit(X_dummy, dummy_labels)
             
+            # NEW: Set dummy metadata
+            model_metadata = {
+                "version": "dummy_0.0.0",
+                "trained_at": datetime.now().isoformat(),
+                "model_type": "dummy",
+                "warning": "Using dummy model for testing - train a real model for production"
+            }
+            
             print("✅ Dummy models created successfully")
             print("💡 To use real models, train and save:")
             print("   - vectorizer.pkl")
             print("   - phishing_model.pkl")
+            print("   - model_metadata.json")
             model_loaded = True
             
     except RuntimeError:
@@ -274,14 +306,16 @@ def reload_model():
 def get_model_status():
     """
     Get the current model loading status.
-    Returns: Dictionary with status information
+    Returns: Dictionary with status information including versioning
     """
     status = {
         "loaded": model_loaded,
         "vectorizer_exists": os.path.exists(VECTORIZER_PATH),
         "model_exists": os.path.exists(MODEL_PATH),
+        "metadata_exists": os.path.exists(METADATA_PATH),  # NEW
         "vectorizer_path": VECTORIZER_PATH,
-        "model_path": MODEL_PATH
+        "model_path": MODEL_PATH,
+        "metadata_path": METADATA_PATH  # NEW
     }
     
     # Add file modification times if files exist
@@ -289,6 +323,19 @@ def get_model_status():
         status["vectorizer_mtime"] = os.path.getmtime(VECTORIZER_PATH)
     if status["model_exists"]:
         status["model_mtime"] = os.path.getmtime(MODEL_PATH)
+    if status["metadata_exists"]:
+        status["metadata_mtime"] = os.path.getmtime(METADATA_PATH)
+    
+    # NEW: Add metadata information if loaded
+    if model_metadata:
+        status["version"] = model_metadata.get("version", "unknown")
+        status["trained_at"] = model_metadata.get("trained_at")
+        status["model_type"] = model_metadata.get("model_type")
+        status["accuracy"] = model_metadata.get("accuracy")
+        status["f1_score"] = model_metadata.get("f1_score")
+        # Include warning if present
+        if "warning" in model_metadata:
+            status["warning"] = model_metadata["warning"]
     
     return status
 
@@ -337,14 +384,15 @@ def predict_email(text):
         # Get probability scores for both classes
         probabilities = model.predict_proba(text_vectorized)[0]
         
-        # Format result
+        # Format result with model version
         result = {
             "prediction": "phishing" if prediction == 1 else "safe",
             "confidence": float(max(probabilities)),  # Confidence in the prediction
             "probabilities": {
                 "safe": float(probabilities[0]),
                 "phishing": float(probabilities[1])
-            }
+            },
+            "model_version": model_metadata.get("version", "unknown") if model_metadata else "unknown"  # NEW
         }
         
         return result
@@ -412,7 +460,10 @@ def predict_emails_batch(texts):
         # Get probability scores for all texts
         probabilities_array = model.predict_proba(texts_vectorized)
         
-        # Format results
+        # Get model version once for all predictions
+        version = model_metadata.get("version", "unknown") if model_metadata else "unknown"
+        
+        # Format results with model version
         for pred, probs in zip(predictions, probabilities_array):
             result = {
                 "prediction": "phishing" if pred == 1 else "safe",
@@ -420,7 +471,8 @@ def predict_emails_batch(texts):
                 "probabilities": {
                     "safe": float(probs[0]),
                     "phishing": float(probs[1])
-                }
+                },
+                "model_version": version  # NEW
             }
             results.append(result)
         

@@ -188,13 +188,13 @@ async function classifyEmails(emailObjects) {
     // Call batch prediction
     const predictions = await predictEmailsBatch(texts);
 
-    // Map results back with email IDs
+    // Map results back with email IDs (use actual model version from ML service)
     const results = emailObjects.map((obj, index) => ({
       emailId: obj.id,
       prediction: predictions[index].prediction,
       confidence: predictions[index].confidence,
       probabilities: predictions[index].probabilities,
-      modelVersion: '1.0' // Static version for now
+      modelVersion: predictions[index].model_version || 'unknown' // Use actual version from ML service
     }));
 
     return results;

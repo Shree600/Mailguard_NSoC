@@ -376,15 +376,18 @@ class ModelRetrainer:
         except Exception as e:
             print(f"Could not show feature importance: {e}")
     
-    def save_models(self):
+    def save_models(self, metrics=None):
         """
-        Save trained models to disk
+        Save trained models and metadata to disk
         
+        Args:
+            metrics: Dictionary of evaluation metrics to save
+            
         Returns:
             bool: True if successful, False otherwise
         """
         print("\n" + "=" * 60)
-        print("STEP 5: Saving Models")
+        print("STEP 5: Saving Models and Metadata")
         print("=" * 60 + "\n")
         
         try:
@@ -400,9 +403,44 @@ class ModelRetrainer:
             model_size = os.path.getsize(self.model_path) / 1024  # KB
             print(f"SUCCESS: Model saved ({model_size:.1f} KB)")
             
+            # NEW: Save metadata
+            metadata_path = 'model_metadata.json'
+            print(f"\nSaving metadata to: {metadata_path}")
+            
+            # Generate version from timestamp
+            version = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            metadata = {
+                "version": version,
+                "trained_at": datetime.now().isoformat(),
+                "model_type": self.model_type,
+                "training_samples": len(self.X_train),
+                "test_samples": len(self.X_test),
+                "vocabulary_size": len(self.vectorizer.vocabulary_)
+            }
+            
+            # Add metrics if provided
+            if metrics:
+                metadata["accuracy"] = float(metrics.get('accuracy', 0))
+                metadata["precision"] = float(metrics.get('precision', 0))
+                metadata["recall"] = float(metrics.get('recall', 0))
+                metadata["f1_score"] = float(metrics.get('f1_score', 0))
+            
+            # Write metadata JSON
+            import json
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            metadata_size = os.path.getsize(metadata_path) / 1024  # KB
+            print(f"SUCCESS: Metadata saved ({metadata_size:.1f} KB)")
+            print(f"  Version: {version}")
+            if metrics:
+                print(f"  Accuracy: {metadata['accuracy']*100:.2f}%")
+            
             print("\nModel files ready for deployment:")
             print(f"  - {self.vectorizer_path}")
             print(f"  - {self.model_path}")
+            print(f"  - {metadata_path}")
             
             return True
             
@@ -442,8 +480,8 @@ class ModelRetrainer:
         if metrics is None:
             return False
         
-        # Step 5: Save models
-        if not self.save_models():
+        # Step 5: Save models with metrics
+        if not self.save_models(metrics):
             return False
         
         # Success

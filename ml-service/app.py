@@ -82,6 +82,7 @@ class PredictionResponse(BaseModel):
     prediction: str
     confidence: float
     probabilities: dict
+    model_version: str  # NEW: Include model version for tracking
 
 
 # Batch prediction request/response models
@@ -247,7 +248,7 @@ async def get_model_status():
     Get current model loading status and file information.
     
     Returns:
-        Model status information including file paths and modification times
+        Model status information including file paths, modification times, and versioning
     """
     try:
         status = predictor.get_model_status()
@@ -256,10 +257,20 @@ async def get_model_status():
             "model_loaded": status["loaded"],
             "vectorizer_exists": status["vectorizer_exists"],
             "model_exists": status["model_exists"],
+            "metadata_exists": status.get("metadata_exists", False),  # NEW
             "vectorizer_path": status["vectorizer_path"],
             "model_path": status["model_path"],
+            "metadata_path": status.get("metadata_path"),  # NEW
             "vectorizer_mtime": status.get("vectorizer_mtime"),
-            "model_mtime": status.get("model_mtime")
+            "model_mtime": status.get("model_mtime"),
+            "metadata_mtime": status.get("metadata_mtime"),  # NEW
+            # NEW: Include versioning information
+            "version": status.get("version"),
+            "trained_at": status.get("trained_at"),
+            "model_type": status.get("model_type"),
+            "accuracy": status.get("accuracy"),
+            "f1_score": status.get("f1_score"),
+            "warning": status.get("warning")
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status error: {str(e)}")
