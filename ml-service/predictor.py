@@ -5,9 +5,13 @@ import os
 import joblib
 import numpy as np
 import json  # NEW: For metadata loading
+import time  # NEW: For performance timing
+import asyncio  # NEW: For async support
 from datetime import datetime  # NEW: For timestamps
+from concurrent.futures import ThreadPoolExecutor  # NEW: For async predictions
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
+from prediction_cache import init_cache, get_cache  # NEW: Prediction caching
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -17,6 +21,9 @@ vectorizer = None
 model = None
 model_loaded = False
 model_metadata = None  # NEW: Store model metadata
+
+# NEW: Thread pool for async predictions
+executor = ThreadPoolExecutor(max_workers=4)
 
 # Model directory configuration (supports Docker volumes)
 # In Docker: MODEL_DIR=/app/models (persisted volume)
@@ -152,6 +159,12 @@ def load_models():
             print("   - phishing_model.pkl")
             print("   - model_metadata.json")
             model_loaded = True
+        
+        # NEW: Initialize prediction cache after models loaded
+        cache = init_cache(max_size=10000, ttl_seconds=3600)  # 1 hour TTL
+        version = model_metadata.get("version", "unknown") if model_metadata else "unknown"
+        cache.current_model_version = version
+        print(f"✅ Prediction cache initialized (version: {version})")
             
     except RuntimeError:
         # Re-raise RuntimeError as-is (already has good error message)
@@ -282,6 +295,25 @@ def reload_model():
         model = new_model
         model_loaded = True
         
+        # NEW: Reload metadata and invalidate cache
+        new_metadata = None
+        if os.path.exists(METADATA_PATH):
+            try:
+                with open(METADATA_PATH, 'r') as f:
+                    new_metadata = json.load(f)
+                print(f"✅ Metadata reloaded (version: {new_metadata.get('version', 'unknown')})")
+            except Exception as metadata_error:
+                print(f"⚠️ Warning: Could not load metadata: {str(metadata_error)}")
+        
+        model_metadata = new_metadata
+        
+        # NEW: Invalidate prediction cache on model reload
+        cache = get_cache()
+        if cache:
+            new_version = new_metadata.get("version", "unknown") if new_metadata else "unknown"
+            invalidated_count = cache.invalidate_all(new_version)
+            print(f"🔄 Cache invalidated: {invalidated_count} entries cleared")
+        
         print("✅ Models reloaded and validated successfully!")
         print("="*50 + "\n")
         
@@ -380,6 +412,20 @@ def predict_email(text):
         )
     
     try:
+        # NEW: Get model version for caching
+        model_version = model_metadata.get("version", "unknown") if model_metadata else "unknown"
+        
+        # NEW: Check cache first
+        cache = get_cache()
+        if cache:
+            cached_result = cache.get(text, model_version)
+            if cached_result is not None:
+                # Cache hit - return immediately
+                return cached_result
+        
+        # Cache miss - perform prediction
+        start_time = time.time()
+        
         # Preprocess and vectorize the text
         text_vectorized = vectorizer.transform([text])
         
@@ -389,6 +435,9 @@ def predict_email(text):
         # Get probability scores for both classes
         probabilities = model.predict_proba(text_vectorized)[0]
         
+        # NEW: Calculate prediction latency
+        prediction_time = time.time() - start_time
+        
         # Format result with model version
         result = {
             "prediction": "phishing" if prediction == 1 else "safe",
@@ -397,8 +446,16 @@ def predict_email(text):
                 "safe": float(probabilities[0]),
                 "phishing": float(probabilities[1])
             },
-            "model_version": model_metadata.get("version", "unknown") if model_metadata else "unknown"  # NEW
+            "model_version": model_version
         }
+        
+        # NEW: Store in cache
+        if cache:
+            cache.set(text, model_version, result)
+        
+        # NEW: Log slow predictions
+        if prediction_time > 0.1:  # > 100ms
+            print(f"⚠️ Slow prediction: {prediction_time*1000:.1f}ms (text length: {len(text)} chars)")
         
         return result
         
@@ -445,7 +502,10 @@ def predict_emails_batch(texts):
         )
     
     try:
-        results = []
+        start_time = time.time()
+        
+        # Get model version for caching
+        model_version = model_metadata.get("version", "unknown") if model_metadata else "unknown"
         
         # Validate all texts first
         validated_texts = []
@@ -456,30 +516,67 @@ def predict_emails_batch(texts):
                 raise ValueError(f"Text at index {i} cannot be empty or whitespace-only")
             validated_texts.append(text)
         
-        # Vectorize all texts at once (more efficient than one-by-one)
-        texts_vectorized = vectorizer.transform(validated_texts)
+        # NEW: Check cache for each text and collect misses
+        cache = get_cache()
+        results = [None] * len(validated_texts)  # Pre-allocate results array
+        texts_to_predict = []  # Texts not in cache
+        indices_to_predict = []  # Original indices for cache misses
         
-        # Get predictions for all texts
-        predictions = model.predict(texts_vectorized)
+        if cache:
+            for i, text in enumerate(validated_texts):
+                cached_result = cache.get(text, model_version)
+                if cached_result is not None:
+                    # Cache hit
+                    results[i] = cached_result
+                else:
+                    # Cache miss - need to predict
+                    texts_to_predict.append(text)
+                    indices_to_predict.append(i)
+        else:
+            # No cache - predict all
+            texts_to_predict = validated_texts
+            indices_to_predict = list(range(len(validated_texts)))
         
-        # Get probability scores for all texts
-        probabilities_array = model.predict_proba(texts_vectorized)
+        # If we have cache misses, batch-predict them
+        if texts_to_predict:
+            # Vectorize texts that need prediction
+            texts_vectorized = vectorizer.transform(texts_to_predict)
+            
+            # Get predictions for cache misses
+            predictions = model.predict(texts_vectorized)
+            
+            # Get probability scores for cache misses
+            probabilities_array = model.predict_proba(texts_vectorized)
+            
+            # Format and store new predictions
+            for idx, pred, probs in zip(indices_to_predict, predictions, probabilities_array):
+                result = {
+                    "prediction": "phishing" if pred == 1 else "safe",
+                    "confidence": float(max(probs)),
+                    "probabilities": {
+                        "safe": float(probs[0]),
+                        "phishing": float(probs[1])
+                    },
+                    "model_version": model_version
+                }
+                results[idx] = result
+                
+                # Store in cache
+                if cache:
+                    cache.set(validated_texts[idx], model_version, result)
         
-        # Get model version once for all predictions
-        version = model_metadata.get("version", "unknown") if model_metadata else "unknown"
+        # NEW: Log performance metrics
+        total_time = time.time() - start_time
+        cache_hits = len(validated_texts) - len(texts_to_predict)
+        cache_hit_rate = (cache_hits / len(validated_texts)) * 100 if validated_texts else 0
         
-        # Format results with model version
-        for pred, probs in zip(predictions, probabilities_array):
-            result = {
-                "prediction": "phishing" if pred == 1 else "safe",
-                "confidence": float(max(probs)),
-                "probabilities": {
-                    "safe": float(probs[0]),
-                    "phishing": float(probs[1])
-                },
-                "model_version": version  # NEW
-            }
-            results.append(result)
+        print(f"📊 Batch prediction: {len(validated_texts)} texts, "
+              f"{cache_hits} cache hits ({cache_hit_rate:.1f}%), "
+              f"{len(texts_to_predict)} predictions, "
+              f"{total_time*1000:.1f}ms total")
+        
+        if total_time > 1.0:  # > 1 second
+            print(f"⚠️ Slow batch prediction: {total_time:.2f}s for {len(validated_texts)} texts")
         
         return results
         
@@ -490,9 +587,35 @@ def predict_emails_batch(texts):
         raise RuntimeError(f"Batch prediction error: {str(e)}")
 
 
-# Load models when module is imported
-print("\n" + "="*50)
-print("🚀 Initializing ML Service")
+# NEW: Async wrappers for non-blocking predictions
+async def predict_email_async(text):
+    """
+    Async wrapper for predict_email() - runs in thread pool to avoid blocking.
+    
+    Args:
+        text (str): Email body text to analyze
+        
+    Returns:
+        dict: Prediction result (same format as predict_email)
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, predict_email, text)
+
+
+async def predict_emails_batch_async(texts):
+    """
+    Async wrapper for predict_emails_batch() - runs in thread pool to avoid blocking.
+    
+    Args:
+        texts (list): List of email body texts to analyze
+        
+    Returns:
+        list: List of prediction results (same format as predict_emails_batch)
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, predict_emails_batch, texts)
+
+
 print("="*50)
 load_models()
 print("="*50 + "\n")

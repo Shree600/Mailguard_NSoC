@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
 import predictor  # Import predictor to load models at startup
+from prediction_cache import get_cache  # NEW: For cache stats endpoint
 import traceback
 
 # Initialize FastAPI app
@@ -163,8 +164,8 @@ async def predict(request: PredictionRequest):
         if not request.text or request.text.strip() == "":
             raise HTTPException(status_code=400, detail="Email text cannot be empty")
         
-        # Make prediction
-        result = predictor.predict_email(request.text)
+        # Make prediction (async - non-blocking)
+        result = await predictor.predict_email_async(request.text)
         
         return result
         
@@ -201,8 +202,8 @@ async def predict_batch(request: BatchPredictionRequest):
         if len(request.texts) > 1000:
             raise HTTPException(status_code=400, detail="Maximum 1000 texts per batch")
         
-        # Make batch prediction
-        results = predictor.predict_emails_batch(request.texts)
+        # Make batch prediction (async - non-blocking)
+        results = await predictor.predict_emails_batch_async(request.texts)
         
         return {
             "predictions": results,
@@ -289,3 +290,55 @@ async def get_model_status():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status error: {str(e)}")
+
+# NEW: Cache statistics endpoint
+@app.get("/cache/stats")
+async def get_cache_stats():
+    """
+    Get prediction cache performance statistics.
+    
+    Returns:
+        Cache metrics including size, hit rate, evictions, etc.
+    """
+    try:
+        cache = get_cache()
+        if not cache:
+            return {
+                "success": False,
+                "message": "Cache not initialized"
+            }
+        
+        stats = cache.get_stats()
+        return {
+            "success": True,
+            **stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache stats error: {str(e)}")
+
+
+# NEW: Clear cache endpoint
+@app.post("/cache/clear")
+async def clear_cache():
+    """
+    Clear all cached predictions.
+    
+    Returns:
+        Success status and number of entries cleared
+    """
+    try:
+        cache = get_cache()
+        if not cache:
+            return {
+                "success": False,
+                "message": "Cache not initialized"
+            }
+        
+        cleared_count = cache.clear()
+        return {
+            "success": True,
+            "message": f"Cache cleared: {cleared_count} entries removed",
+            "cleared_count": cleared_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache clear error: {str(e)}")
