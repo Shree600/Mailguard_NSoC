@@ -30,6 +30,15 @@ RUN if [ -f vectorizer.pkl ]; then cp vectorizer.pkl /app/models/; fi && \
     if [ -f phishing_model.pkl ]; then cp phishing_model.pkl /app/models/; fi && \
     if [ -f sample_training.csv ]; then cp sample_training.csv /app/datasets/; fi
 
+# Create non-root user for security
+RUN useradd -m -u 1001 -s /bin/bash appuser
+
+# Change ownership of app directory and persistent directories
+RUN chown -R appuser:appuser /app /app/models /app/datasets
+
+# Switch to non-root user
+USER appuser
+
 # Expose ML service port
 EXPOSE 8000
 
