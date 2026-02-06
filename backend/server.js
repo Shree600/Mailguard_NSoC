@@ -42,8 +42,25 @@ app.use(express.json());
 
 // Enable CORS (Cross-Origin Resource Sharing)
 // Restrict to specific frontend origin for security
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173', // Vite dev server
+  'http://localhost:3000'  // Legacy dev port
+].filter(Boolean); // Remove undefined values
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️  Blocked CORS request from unauthorized origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true, // Allow cookies and authorization headers
   optionsSuccessStatus: 200
 };
