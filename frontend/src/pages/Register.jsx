@@ -8,23 +8,18 @@ import Logo from '../components/Logo'
 
 function Register() {
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black">
-        <div className="absolute inset-0 bg-gradient-to-tl from-purple-900/20 via-pink-900/20 to-blue-900/20 animate-pulse"></div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-100 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Subtle pattern overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(147,51,234,.03)_1px,transparent_1px),linear-gradient(90deg,rgba(147,51,234,.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
       
-      {/* Grid pattern overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
-      
-      <div className="relative bg-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-8">
+      <div className="relative bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-xl w-full max-w-md p-8">
         {/* Header with Logo */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
             <Logo size="lg" showText={true} />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-          <p className="text-gray-400">Join Mailguard for AI protection</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+          <p className="text-gray-600">Join Mailguard for AI protection</p>
         </div>
 
         {/* Clerk SignUp Component */}
