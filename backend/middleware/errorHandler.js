@@ -97,37 +97,17 @@ const notFoundHandler = (req, res, next) => {
 };
 
 /**
- * Handle uncaught exceptions
- * Logs the error and exits gracefully
+ * REMOVED: Global error handlers (uncaughtException, unhandledRejection)
+ * These are now registered in server.js BEFORE any async operations
+ * to ensure they're the first handlers in the chain.
+ * 
+ * Having them here caused duplicate registration, leading to:
+ * - Double logging of the same errors
+ * - Race conditions on process.exit()
+ * - Confusion in production error tracking
+ * 
+ * See server.js lines 20-43 for the authoritative global error handlers.
  */
-const handleUncaughtException = () => {
-  process.on('uncaughtException', (err) => {
-    console.error('\n❌ UNCAUGHT EXCEPTION! Shutting down...');
-    console.error('Error:', err.message);
-    console.error('Stack:', err.stack);
-    
-    // Exit process
-    process.exit(1);
-  });
-};
-
-/**
- * Handle unhandled promise rejections
- * Logs the error and exits gracefully
- */
-const handleUnhandledRejection = () => {
-  process.on('unhandledRejection', (reason, promise) => {
-    console.error('\n❌ UNHANDLED REJECTION! Shutting down...');
-    console.error('Reason:', reason);
-    
-    // Exit process
-    process.exit(1);
-  });
-};
-
-// Initialize global handlers
-handleUncaughtException();
-handleUnhandledRejection();
 
 // Export middleware
 module.exports = {
