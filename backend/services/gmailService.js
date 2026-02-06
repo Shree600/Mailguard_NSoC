@@ -56,6 +56,7 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
     let pageToken = null;
     let pageCount = 0;
     const MAX_PAGES = 50; // Safety limit: 50 pages * 100 = 5000 message IDs max
+    const MAX_RETRIES = 3; // Retry transient failures up to 3 times
 
     do {
       pageCount++;
@@ -69,12 +70,41 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
         break;
       }
 
-      const listResponse = await gmail.users.messages.list({
-        userId: 'me',
-        maxResults: 100, // Fetch 100 per page (Gmail API supports up to 500, but 100 is more reliable)
-        q: searchQuery,
-        pageToken: pageToken
-      });
+      // Retry logic for pagination (handles transient failures)
+      let listResponse = null;
+      let retryCount = 0;
+      
+      while (retryCount < MAX_RETRIES) {
+        try {
+          listResponse = await gmail.users.messages.list({
+            userId: 'me',
+            maxResults: 100, // Fetch 100 per page (Gmail API supports up to 500, but 100 is more reliable)
+            q: searchQuery,
+            pageToken: pageToken
+          });
+          break; // Success, exit retry loop
+        } catch (retryError) {
+          retryCount++;
+          
+          // Check if error is retryable (5xx, timeout, network)
+          const isRetryable = 
+            (retryError.code >= 500 && retryError.code < 600) ||
+            retryError.code === 'ETIMEDOUT' ||
+            retryError.code === 'ESOCKETTIMEDOUT' ||
+            retryError.code === 'ECONNRESET' ||
+            retryError.message?.includes('timeout');
+          
+          if (!isRetryable || retryCount >= MAX_RETRIES) {
+            // Not retryable or max retries reached, throw error
+            throw retryError;
+          }
+          
+          // Exponential backoff: 1s, 2s, 4s
+          const backoffMs = Math.pow(2, retryCount - 1) * 1000;
+          console.warn(`   ⚠️  Pagination failed (attempt ${retryCount}/${MAX_RETRIES}), retrying in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
 
       // Add messages from this page
       if (listResponse.data.messages && listResponse.data.messages.length > 0) {
@@ -126,22 +156,48 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
 
       // Process this batch in parallel
       const batchPromises = batch.map(async (message) => {
-        try {
-          // Get full message details
-          const messageDetails = await gmail.users.messages.get({
-            userId: 'me',
-            id: message.id,
-            format: 'full', // Get full message including body
-          });
+        // Retry logic for individual message fetch
+        let retryCount = 0;
+        const MAX_MESSAGE_RETRIES = 2; // Retry each message up to 2 times
+        
+        while (retryCount < MAX_MESSAGE_RETRIES) {
+          try {
+            // Get full message details
+            const messageDetails = await gmail.users.messages.get({
+              userId: 'me',
+              id: message.id,
+              format: 'full', // Get full message including body
+            });
 
-          // Parse the email
-          const parsedEmail = parseGmailMessage(messageDetails.data);
-          
-          return parsedEmail;
-        } catch (error) {
-          console.error(`   ❌ Error fetching message ${message.id}:`, error.message);
-          return null; // Skip this email if fetch fails
+            // Parse the email
+            const parsedEmail = parseGmailMessage(messageDetails.data);
+            
+            return parsedEmail;
+          } catch (error) {
+            retryCount++;
+            
+            // Check if error is retryable
+            const isRetryable = 
+              (error.code >= 500 && error.code < 600) ||
+              error.code === 'ETIMEDOUT' ||
+              error.code === 'ESOCKETTIMEDOUT' ||
+              error.code === 'ECONNRESET' ||
+              error.message?.includes('timeout');
+            
+            // If not retryable or max retries reached, log and skip
+            if (!isRetryable || retryCount >= MAX_MESSAGE_RETRIES) {
+              console.error(`   ❌ Error fetching message ${message.id} (attempt ${retryCount}): ${error.message}`);
+              return null; // Skip this email
+            }
+            
+            // Exponential backoff for retry: 500ms, 1s
+            const backoffMs = Math.pow(2, retryCount - 1) * 500;
+            await new Promise(resolve => setTimeout(resolve, backoffMs));
+          }
         }
+        
+        // If we get here, all retries failed
+        return null;
       });
 
       // Wait for this batch to complete
@@ -188,13 +244,32 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
     if (error.code === 429) {
       const rateLimitError = new Error('Gmail API rate limit exceeded. Please try again later.');
       rateLimitError.code = 429;
+      rateLimitError.retryAfter = error.response?.headers?.['retry-after'] || 60; // Seconds to wait
       throw rateLimitError;
     }
     
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    // Network timeout errors
+    if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKETTIMEDOUT' || error.message?.includes('timeout')) {
+      const timeoutError = new Error('Gmail request timed out. Please check your internet connection and try again.');
+      timeoutError.code = 504;
+      timeoutError.isTransient = true; // Can retry
+      throw timeoutError;
+    }
+    
+    // Network connection errors
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
       const networkError = new Error('Cannot connect to Gmail servers. Check your internet connection.');
       networkError.code = 503;
+      networkError.isTransient = true; // Can retry
       throw networkError;
+    }
+    
+    // Gmail server errors (5xx) - often transient
+    if (error.code >= 500 && error.code < 600) {
+      const serverError = new Error(`Gmail servers are experiencing issues (${error.code}). Please try again in a few minutes.`);
+      serverError.code = error.code;
+      serverError.isTransient = true; // Can retry
+      throw serverError;
     }
     
     // Generic error
@@ -411,6 +486,30 @@ const getGmailAddress = async (user) => {
     return profile.data.emailAddress;
   } catch (error) {
     console.error('Error getting Gmail address:', error.message);
+    
+    // Preserve requiresReauth flag if already set
+    if (error.requiresReauth) {
+      throw error;
+    }
+    
+    // Auth errors
+    if (error.code === 401 || error.code === 403) {
+      const authError = new Error('Gmail authentication failed. Please reconnect Gmail.');
+      authError.code = 401;
+      authError.requiresReauth = true;
+      throw authError;
+    }
+    
+    // Network/timeout errors
+    if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKETTIMEDOUT' || 
+        error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' ||
+        error.message?.includes('timeout')) {
+      const networkError = new Error('Cannot connect to Gmail. Please check your internet connection.');
+      networkError.code = 503;
+      networkError.isTransient = true;
+      throw networkError;
+    }
+    
     throw error;
   }
 };
@@ -459,19 +558,37 @@ const deleteEmail = async (gmailId, accessToken, refreshToken) => {
     console.error(`❌ Error deleting Gmail message ${gmailId}:`, error.message);
 
     // Handle specific Gmail API errors
-    if (error.code === 401) {
-      throw new Error('Gmail authentication failed. Token may be expired. Please reconnect Gmail.');
+    if (error.code === 401 || error.code === 403) {
+      const authError = new Error('Gmail authentication failed. Token may be expired. Please reconnect Gmail.');
+      authError.code = 401;
+      authError.requiresReauth = true;
+      throw authError;
     }
 
     if (error.code === 404) {
-      throw new Error('Email not found in Gmail. It may have already been deleted.');
+      // Email not found - not really an error, might be already deleted
+      console.log(`   ℹ️  Email ${gmailId} not found (may be already deleted)`);
+      return {
+        success: true,
+        gmailId: gmailId,
+        message: 'Email not found (may be already deleted)',
+      };
     }
 
-    if (error.code === 403) {
-      throw new Error('Permission denied. Unable to delete email from Gmail.');
+    // Network/timeout errors
+    if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKETTIMEDOUT' || 
+        error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' ||
+        error.message?.includes('timeout')) {
+      const networkError = new Error('Cannot connect to Gmail. Please check your internet connection.');
+      networkError.code = 503;
+      networkError.isTransient = true;
+      throw networkError;
     }
 
-    throw new Error(`Failed to delete email from Gmail: ${error.message}`);
+    // Generic error with original message
+    const genericError = new Error(`Failed to delete email from Gmail: ${error.message}`);
+    genericError.code = error.code || 500;
+    throw genericError;
   }
 };
 
