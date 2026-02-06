@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useUser, useClerk } from '@clerk/clerk-react'
+import { toast } from 'sonner'
 import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus } from '../services/api'
 import EmailTable from '../components/EmailTable'
 import EmailStatsChart from '../components/EmailStatsChart'
@@ -88,13 +89,13 @@ function Dashboard() {
     const gmailStatus = urlParams.get('gmail')
     
     if (gmailStatus === 'connected') {
-      alert('✅ Gmail connected successfully! You can now fetch emails.')
+      toast.success('Gmail connected successfully! You can now fetch emails.')
       setGmailConnected(true)
       // Clean URL
       window.history.replaceState({}, '', '/dashboard')
     } else if (gmailStatus === 'error') {
       const errorMessage = urlParams.get('message') || 'Failed to connect Gmail'
-      alert(`❌ ${errorMessage}`)
+      toast.error(errorMessage)
       // Clean URL
       window.history.replaceState({}, '', '/dashboard')
     }
@@ -183,7 +184,7 @@ function Dashboard() {
       const response = await migrateEmails()
       
       console.log('✅ Migration complete:', response)
-      alert(`✅ Successfully migrated ${response.updated} emails to your account!`)
+      toast.success(`Successfully migrated ${response.updated} emails to your account!`)
       
       // Refresh everything
       setMigrationNeeded(false)
@@ -191,7 +192,7 @@ function Dashboard() {
       await fetchEmails()
     } catch (err) {
       console.error('❌ Migration failed:', err)
-      alert('Failed to migrate emails. Please try again.')
+      toast.error('Failed to migrate emails. Please try again.')
     } finally {
       setMigrating(false)
     }
@@ -211,7 +212,7 @@ function Dashboard() {
       fetchStats()
     } catch (err) {
       console.error('❌ Failed to delete email:', err)
-      alert('Failed to delete email. Please try again.')
+      toast.error('Failed to delete email. Please try again.')
     }
   }
 
@@ -222,7 +223,7 @@ function Dashboard() {
       console.log('📧 Email for feedback:', email)
       
       if (!email) {
-        alert('Email not found')
+        toast.error('Email not found')
         return
       }
 
@@ -230,7 +231,7 @@ function Dashboard() {
       console.log('🔍 Email prediction:', email.prediction, 'Type:', typeof email.prediction)
       
       if (!email.prediction || email.prediction === 'pending') {
-        alert('This email hasn\'t been classified yet. Please run "Fetch & Scan" first.')
+        toast.warning('This email hasn\'t been classified yet. Please run "Fetch & Scan" first.')
         return
       }
 
@@ -261,7 +262,7 @@ function Dashboard() {
       await submitFeedback(feedbackData)
 
       console.log('✅ Feedback submitted successfully')
-      alert('Thank you for your feedback! This helps improve our AI.')
+      toast.success('Thank you for your feedback! This helps improve our AI.')
       
       // Optionally refresh emails
       fetchEmails()
@@ -276,9 +277,9 @@ function Dashboard() {
           handleMigrateEmails()
         }
       } else if (err.response?.status === 400) {
-        alert(`❌ Invalid feedback data: ${err.response?.data?.error || 'Unknown error'}`)
+        toast.error(err.response?.data?.error || 'Invalid feedback data')
       } else {
-        alert(`Failed to submit feedback: ${err.response?.data?.error || err.message}`)
+        toast.error(err.response?.data?.error || err.message || 'Failed to submit feedback')
       }
     }
   }
@@ -311,7 +312,7 @@ function Dashboard() {
   // Handle bulk delete selected emails
   const handleBulkDelete = async () => {
     if (selectedEmails.length === 0) {
-      alert('Please select emails to delete')
+      toast.error('Please select emails to delete')
       return
     }
     
@@ -333,14 +334,14 @@ function Dashboard() {
       setSelectedEmails([])
       
       // Show success message
-      alert(`Successfully deleted ${result.results.successful} out of ${result.results.total} emails`)
+      toast.success(`Successfully deleted ${result.results.successful} out of ${result.results.total} emails`)
       
       // Refresh emails and stats
       fetchEmails()
       fetchStats()
     } catch (err) {
       console.error('❌ Failed to bulk delete emails:', err)
-      alert('Failed to delete emails. Please try again.')
+      toast.error('Failed to delete emails. Please try again.')
     }
   }
   
@@ -378,7 +379,7 @@ function Dashboard() {
           return // handleFetchEmails already refreshes
         }
       } else {
-        alert('No phishing emails found to clean.')
+        toast.info('No phishing emails found to clean.')
       }
       
       // Refresh emails and stats
@@ -386,7 +387,7 @@ function Dashboard() {
       fetchStats()
     } catch (err) {
       console.error('❌ Failed to clean phishing emails:', err)
-      alert('Failed to clean phishing emails. Please try again.')
+      toast.error('Failed to clean phishing emails. Please try again.')
     }
   }
 
@@ -407,7 +408,7 @@ function Dashboard() {
       }
     } catch (err) {
       console.error('❌ Failed to initiate Gmail auth:', err)
-      alert('Failed to connect Gmail. Please try again.')
+      toast.error('Failed to connect Gmail. Please try again.')
     }
   }
   
@@ -429,12 +430,10 @@ function Dashboard() {
       const classifyResponse = await classifyEmails()
       console.log('✅ Emails classified:', classifyResponse)
       
-      const message = `✅ Fetched ${fetchResponse.data.fetched} emails (${fetchResponse.data.saved} new)!\n` +
-        `📊 Classified: ${classifyResponse.stats.processed} emails\n` +
-        `🚨 Phishing: ${classifyResponse.stats.phishing} | ✅ Safe: ${classifyResponse.stats.safe}`
+      const message = `Fetched ${fetchResponse.data.fetched} emails (${fetchResponse.data.saved} new)! Classified: ${classifyResponse.stats.processed} emails - Phishing: ${classifyResponse.stats.phishing} | Safe: ${classifyResponse.stats.safe}`
       
       if (!skipConfirm) {
-        alert(message)
+        toast.success(message, { duration: 5000 })
       }
       
       // Refresh emails and stats
@@ -454,9 +453,9 @@ function Dashboard() {
       
       // Check if Gmail not connected
       if (err.response?.status === 400) {
-        alert('Gmail not connected. Please connect your Gmail account first.')
+        toast.error('Gmail not connected. Please connect your Gmail account first.')
       } else {
-        alert('Failed to fetch emails. Please try again.')
+        toast.error('Failed to fetch emails. Please try again.')
       }
     } finally {
       setFetchingEmails(false)
