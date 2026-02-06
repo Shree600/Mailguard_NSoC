@@ -16,6 +16,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const syncUserMiddleware = require('../middleware/syncUserMiddleware');
 const { gmailFetchLimiter } = require('../middleware/rateLimiter');
 const { validate, schemas } = require('../middleware/validation');
+const { invalidateCacheMiddleware } = require('../middleware/cacheMiddleware');
 
 /**
  * GMAIL OAUTH ROUTES
@@ -58,6 +59,7 @@ router.get('/status', authMiddleware, syncUserMiddleware, checkGmailStatus);
  * @returns Success message
  */
 router.delete('/disconnect', authMiddleware, syncUserMiddleware, disconnectGmail);
+
 /**
  * @route   POST /api/gmail/fetch
  * @desc    Fetch emails from Gmail and save to database
@@ -66,7 +68,16 @@ router.delete('/disconnect', authMiddleware, syncUserMiddleware, disconnectGmail
  * @query   maxResults - Number of emails to fetch (default: 20, max: 100)
  * @returns Statistics about fetched and saved emails
  * @ratelimit 10 requests per hour per IP
+ * INVALIDATES: User cache after fetching new emails
  */
-router.post('/fetch', gmailFetchLimiter, authMiddleware, syncUserMiddleware, validate(schemas.gmailFetch, 'query'), fetchAndSaveEmails);
+router.post('/fetch', 
+  gmailFetchLimiter, 
+  authMiddleware, 
+  syncUserMiddleware, 
+  validate(schemas.gmailFetch, 'query'), 
+  invalidateCacheMiddleware(), // Invalidate user cache after fetch
+  fetchAndSaveEmails
+);
+
 // Export the router
 module.exports = router;

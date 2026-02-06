@@ -9,6 +9,7 @@ const syncUserMiddleware = require('../middleware/syncUserMiddleware');
 const adminAuth = require('../middleware/adminAuth');
 const { validate, schemas } = require('../middleware/validation');
 const { adminOperationLimiter } = require('../middleware/rateLimiter');
+const { getCacheStats, flushCache, invalidateCacheMiddleware } = require('../middleware/cacheMiddleware');
 
 // All admin routes require authentication, user sync, AND admin role
 router.use(authMiddleware);
@@ -24,7 +25,12 @@ router.use(adminAuth); // Verify admin role for ALL admin routes
  *   modelType: "random_forest" or "logistic"
  * }
  */
-router.post('/retrain', adminOperationLimiter, validate(schemas.retrain), adminController.triggerRetraining);
+router.post('/retrain', 
+  adminOperationLimiter, 
+  validate(schemas.retrain), 
+  invalidateCacheMiddleware({ resource: 'classification' }), // Invalidate after retrain
+  adminController.triggerRetraining
+);
 
 /**
  * GET /api/admin/retrain/status
@@ -40,6 +46,24 @@ router.get('/retrain/status', adminController.getRetrainingStatus);
  *   outputFile: "training.csv"
  * }
  */
-router.post('/dataset/build', adminOperationLimiter, validate(schemas.datasetBuild), adminController.buildDataset);
+router.post('/dataset/build', 
+  adminOperationLimiter, 
+  validate(schemas.datasetBuild), 
+  adminController.buildDataset
+);
+
+/**
+ * GET /api/admin/cache/stats
+ * Get cache performance statistics
+ * Returns hit rate, miss rate, keys count, memory usage
+ */
+router.get('/cache/stats', getCacheStats);
+
+/**
+ * POST /api/admin/cache/flush
+ * Flush all cached data
+ * USE WITH CAUTION: Impacts all users
+ */
+router.post('/cache/flush', adminOperationLimiter, flushCache);
 
 module.exports = router;
