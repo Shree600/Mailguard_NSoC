@@ -113,10 +113,7 @@ function EmailTable({
                   />
                 </TableHead>
                 <TableHead className="min-w-[300px]">
-                  <div className="flex items-center gap-2">
-                    Subject
-                    <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                  </div>
+                  Subject
                 </TableHead>
                 <TableHead className="min-w-[200px]">From</TableHead>
                 <TableHead className="w-32">Status</TableHead>
