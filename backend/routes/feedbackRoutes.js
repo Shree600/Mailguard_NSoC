@@ -6,6 +6,7 @@ const router = express.Router();
 const feedbackController = require('../controllers/feedbackController');
 const authMiddleware = require('../middleware/authMiddleware');
 const syncUserMiddleware = require('../middleware/syncUserMiddleware');
+const { validate, schemas } = require('../middleware/validation');
 
 // All feedback routes require authentication
 router.use(authMiddleware);
@@ -16,7 +17,7 @@ router.use(syncUserMiddleware);
  * Submit feedback on an email classification
  * Body: { emailId, correctLabel, notes? }
  */
-router.post('/', feedbackController.submitFeedback);
+router.post('/', validate(schemas.feedback), feedbackController.submitFeedback);
 
 /**
  * GET /api/feedback

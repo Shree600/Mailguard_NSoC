@@ -15,6 +15,7 @@ const {
 const authMiddleware = require('../middleware/authMiddleware');
 const syncUserMiddleware = require('../middleware/syncUserMiddleware');
 const { gmailFetchLimiter } = require('../middleware/rateLimiter');
+const { validate, schemas } = require('../middleware/validation');
 
 /**
  * GMAIL OAUTH ROUTES
@@ -66,6 +67,6 @@ router.delete('/disconnect', authMiddleware, syncUserMiddleware, disconnectGmail
  * @returns Statistics about fetched and saved emails
  * @ratelimit 10 requests per hour per IP
  */
-router.post('/fetch', gmailFetchLimiter, authMiddleware, syncUserMiddleware, fetchAndSaveEmails);
+router.post('/fetch', gmailFetchLimiter, authMiddleware, syncUserMiddleware, validate(schemas.gmailFetch, 'query'), fetchAndSaveEmails);
 // Export the router
 module.exports = router;

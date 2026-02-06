@@ -6,6 +6,7 @@ const router = express.Router();
 const emailController = require('../controllers/emailController');
 const authMiddleware = require('../middleware/authMiddleware');
 const syncUserMiddleware = require('../middleware/syncUserMiddleware');
+const { validate, schemas } = require('../middleware/validation');
 
 // All email routes require authentication and user sync
 router.use(authMiddleware);
@@ -21,13 +22,13 @@ router.get('/stats', emailController.getClassificationStats);
 router.get('/', emailController.getClassifiedEmails);
 
 // Get classified emails
-router.get('/classified', emailController.getClassifiedEmails);
+router.get('/classified', validate(schemas.emailQuery, 'query'), emailController.getClassifiedEmails);
 
 // Delete a single email
 router.delete('/:id', emailController.deleteEmail);
 
 // Bulk delete multiple emails
-router.post('/bulk-delete', emailController.bulkDeleteEmails);
+router.post('/bulk-delete', validate(schemas.bulkOperation), emailController.bulkDeleteEmails);
 
 // Auto clean all phishing emails
 router.post('/clean-phishing', emailController.cleanPhishingEmails);
