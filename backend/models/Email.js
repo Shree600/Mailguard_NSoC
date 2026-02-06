@@ -116,6 +116,30 @@ emailSchema.index({ isAnalyzed: 1, userId: 1 });
 // Index for classification queries
 emailSchema.index({ userId: 1, classification: 1 });
 
+// Text index for full-text search on subject, sender, and body
+// CRITICAL: Enables fast search without regex scanning entire collection
+// Performance: O(log n) index lookup vs O(n) collection scan
+emailSchema.index(
+  { 
+    subject: 'text', 
+    sender: 'text', 
+    body: 'text' 
+  },
+  {
+    name: 'email_text_search',
+    weights: {
+      subject: 10,  // Subject matches weighted higher
+      sender: 5,    // Sender matches weighted medium
+      body: 1       // Body matches weighted normal
+    },
+    default_language: 'english'
+  }
+);
+
+// Compound index for date range queries with sorting
+// Optimizes: Email.find({ userId, receivedAt: {...} }).sort({ receivedAt: -1 })
+emailSchema.index({ userId: 1, receivedAt: -1, classification: 1 });
+
 /**
  * INSTANCE METHODS
  */

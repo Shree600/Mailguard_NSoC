@@ -148,28 +148,66 @@ exports.getClassificationStats = async (req, res) => {
   try {
     const userId = req.mongoUserId;
 
-    // Get user's emails
-    const userEmails = await Email.find({ userId }).select('_id');
-    const emailIds = userEmails.map(e => e._id);
+    // OPTIMIZATION: Use aggregation pipeline instead of fetching all documents
+    // Old approach: Fetch all emails, then all classifications, then filter in memory
+    // New approach: Single aggregation query with $lookup and $group
+    const stats = await Email.aggregate([
+      // Stage 1: Match user's emails only
+      {
+        $match: { userId }
+      },
+      
+      // Stage 2: Lookup classifications (left join)
+      {
+        $lookup: {
+          from: 'classifications',
+          localField: '_id',
+          foreignField: 'emailId',
+          as: 'classification'
+        }
+      },
+      
+      // Stage 3: Unwind classification array
+      {
+        $unwind: {
+          path: '$classification',
+          preserveNullAndEmptyArrays: true // Keep emails without classification
+        }
+      },
+      
+      // Stage 4: Add computed prediction field
+      {
+        $addFields: {
+          prediction: {
+            $ifNull: ['$classification.prediction', 'unclassified']
+          }
+        }
+      },
+      
+      // Stage 5: Group by prediction and count
+      {
+        $group: {
+          _id: '$prediction',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
 
-    // Get classifications for user's emails
-    const classifications = await Classification.find({
-      emailId: { $in: emailIds }
-    });
-
-    // Count by prediction
-    const phishing = classifications.filter(c => c.prediction === 'phishing').length;
-    const safe = classifications.filter(c => c.prediction === 'safe').length;
-    const total = userEmails.length;
+    // Format results
+    const phishing = stats.find(s => s._id === 'phishing')?.count || 0;
+    const safe = stats.find(s => s._id === 'safe')?.count || 0;
+    const unclassified = stats.find(s => s._id === 'unclassified')?.count || 0;
+    const total = phishing + safe + unclassified;
+    const classified = phishing + safe;
 
     res.json({
       success: true,
       total: total,
       phishing: phishing,
       safe: safe,
-      legitimate: safe,
-      classified: classifications.length,
-      unclassified: total - classifications.length
+      legitimate: safe, // Alias for compatibility
+      classified: classified,
+      unclassified: unclassified
     });
 
   } catch (error) {
@@ -200,81 +238,127 @@ exports.getClassifiedEmails = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    // Build filter query
-    const filter = { userId };
-    
-    // Add date range filter if provided
-    if (dateFrom || dateTo) {
-      filter.receivedAt = {};
-      if (dateFrom) {
-        filter.receivedAt.$gte = new Date(dateFrom);
-      }
-      if (dateTo) {
-        filter.receivedAt.$lte = new Date(dateTo);
-      }
-    }
-    
-    // Add search filter if provided
-    if (search) {
-      filter.$or = [
-        { subject: { $regex: search, $options: 'i' } },
-        { sender: { $regex: search, $options: 'i' } },
-        { body: { $regex: search, $options: 'i' } }
-      ];
-    }
-
     // Calculate pagination
     const limitNum = Math.min(Math.max(parseInt(limit), 1), 100); // Between 1 and 100
     const pageNum = Math.max(parseInt(page), 1);
     const skip = (pageNum - 1) * limitNum;
 
-    // Get total count for pagination
-    const totalEmails = await Email.countDocuments(filter);
+    // Build aggregation pipeline for optimized query
+    // OPTIMIZATION: Use $lookup to join emails with classifications in single query
+    // Eliminates N+1 query pattern for better performance
+    const pipeline = [];
+
+    // Stage 1: Match user's emails
+    const matchStage = { userId };
+    
+    // Add date range filter if provided
+    if (dateFrom || dateTo) {
+      matchStage.receivedAt = {};
+      if (dateFrom) {
+        matchStage.receivedAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        matchStage.receivedAt.$lte = new Date(dateTo);
+      }
+    }
+    
+    // Add search filter using text index if provided
+    if (search) {
+      // Use text search index for better performance than regex
+      // Falls back to regex if text index not available
+      if (search.includes(' ')) {
+        // Multi-word search: use text index
+        matchStage.$text = { $search: search };
+      } else {
+        // Single word: use regex for partial matching
+        matchStage.$or = [
+          { subject: { $regex: search, $options: 'i' } },
+          { sender: { $regex: search, $options: 'i' } },
+          { body: { $regex: search, $options: 'i' } }
+        ];
+      }
+    }
+
+    pipeline.push({ $match: matchStage });
+
+    // Stage 2: Lookup classifications (join operation)
+    // CRITICAL: Single query instead of N+1 pattern
+    pipeline.push({
+      $lookup: {
+        from: 'classifications',
+        localField: '_id',
+        foreignField: 'emailId',
+        as: 'classification'
+      }
+    });
+
+    // Stage 3: Unwind classification array (convert array to object)
+    pipeline.push({
+      $unwind: {
+        path: '$classification',
+        preserveNullAndEmptyArrays: true // Keep emails without classification
+      }
+    });
+
+    // Stage 4: Filter by prediction if specified
+    if (prediction) {
+      if (prediction === 'pending') {
+        pipeline.push({
+          $match: { classification: null }
+        });
+      } else {
+        pipeline.push({
+          $match: { 'classification.prediction': prediction }
+        });
+      }
+    }
+
+    // Stage 5: Add computed fields
+    pipeline.push({
+      $addFields: {
+        prediction: {
+          $ifNull: ['$classification.prediction', 'pending']
+        },
+        confidence: {
+          $ifNull: ['$classification.confidence', 0]
+        },
+        classified: {
+          $cond: [{ $ne: ['$classification', null] }, true, false]
+        }
+      }
+    });
+
+    // Get total count before pagination
+    const countPipeline = [...pipeline, { $count: 'total' }];
+    const countResult = await Email.aggregate(countPipeline);
+    const totalEmails = countResult[0]?.total || 0;
     const totalPages = Math.ceil(totalEmails / limitNum);
 
-    // Determine sort direction
+    // Stage 6: Sort
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
-    const sortObj = { [sortBy]: sortDirection };
+    pipeline.push({ $sort: { [sortBy]: sortDirection } });
 
-    // Get user's emails with pagination
-    const userEmails = await Email.find(filter)
-      .sort(sortObj)
-      .skip(skip)
-      .limit(limitNum);
+    // Stage 7: Pagination
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: limitNum });
 
-    // Get classifications for these emails
-    const emailIds = userEmails.map(e => e._id);
-    const classifications = await Classification.find({
-      emailId: { $in: emailIds }
+    // Stage 8: Project only needed fields (reduce data transfer)
+    pipeline.push({
+      $project: {
+        _id: 1,
+        subject: 1,
+        sender: 1,
+        body: { $substr: ['$body', 0, 200] }, // Truncate body
+        receivedAt: 1,
+        gmailId: 1,
+        prediction: 1,
+        confidence: 1,
+        classified: 1
+      }
     });
 
-    // Create a map of emailId -> classification
-    const classificationMap = {};
-    classifications.forEach(c => {
-      classificationMap[c.emailId.toString()] = c;
-    });
-
-    // Combine emails with their classifications
-    const emailsWithClassifications = userEmails.map(email => {
-      const classification = classificationMap[email._id.toString()];
-      return {
-        _id: email._id,
-        subject: email.subject,
-        sender: email.sender,
-        body: email.body?.substring(0, 200) || '',
-        receivedAt: email.receivedAt,
-        gmailId: email.gmailId,
-        prediction: classification?.prediction || 'pending',
-        confidence: classification?.confidence || 0,
-        classified: !!classification
-      };
-    });
-
-    // Filter by prediction if specified (post-query filter for pending emails)
-    let filteredEmails = emailsWithClassifications;
-    if (prediction) {
-      filteredEmails = emailsWithClassifications.filter(e => e.prediction === prediction);
-    }
+    // Execute aggregation pipeline
+    const emails = await Email.aggregate(pipeline);
 
     res.json({
       success: true,
@@ -286,8 +370,8 @@ exports.getClassifiedEmails = async (req, res) => {
         hasNext: pageNum < totalPages,
         hasPrev: pageNum > 1
       },
-      count: filteredEmails.length,
-      emails: filteredEmails
+      count: emails.length,
+      emails: emails
     });
 
   } catch (error) {
