@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
+const timeout = require('connect-timeout');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const validateEnv = require('./config/validateEnv');
@@ -28,6 +29,9 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 // ================================================
 // MIDDLEWARE CONFIGURATION
 // ================================================
+
+// Request timeout protection (prevent hanging connections)
+app.use(timeout('30s'));
 
 // Security headers (XSS, clickjacking protection, etc.)
 app.use(helmet());
@@ -118,6 +122,18 @@ app.use('/api/migration', migrationRoutes);
 
 // Import error handlers
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
+
+// Timeout error handler (must be before other error handlers)
+app.use((req, res, next) => {
+  if (req.timedout) {
+    console.warn(`⏱️  Request timeout: ${req.method} ${req.originalUrl}`);
+    return res.status(408).json({
+      success: false,
+      message: 'Request timeout - operation took too long',
+    });
+  }
+  next();
+});
 
 // 404 handler - must be after all routes
 app.use(notFoundHandler);
