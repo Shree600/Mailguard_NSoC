@@ -6,6 +6,16 @@
 import { useState, useEffect } from 'react'
 import { useUser, useClerk } from '@clerk/clerk-react'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus } from '../services/api'
 import EmailTable from '../components/EmailTable'
 import EmailStatsChart from '../components/EmailStatsChart'
@@ -76,6 +86,15 @@ function Dashboard() {
     fetchAll: false
   })
   const [showFetchOptions, setShowFetchOptions] = useState(false)
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: null,
+    variant: 'destructive' // or 'default'
+  })
 
   // Fetch stats and emails on component mount
   useEffect(() => {
@@ -199,21 +218,27 @@ function Dashboard() {
   }
 
   const handleDelete = async (emailId) => {
-    if (!window.confirm('Are you sure you want to delete this email?')) {
-      return
-    }
-
-    try {
-      await deleteEmail(emailId)
-      console.log('✅ Email deleted:', emailId)
-      
-      // Refresh emails and stats
-      fetchEmails()
-      fetchStats()
-    } catch (err) {
-      console.error('❌ Failed to delete email:', err)
-      toast.error('Failed to delete email. Please try again.')
-    }
+    // Show confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Delete Email',
+      description: 'Are you sure you want to delete this email? This action cannot be undone.',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await deleteEmail(emailId)
+          console.log('✅ Email deleted:', emailId)
+          toast.success('Email deleted successfully')
+          
+          // Refresh emails and stats
+          fetchEmails()
+          fetchStats()
+        } catch (err) {
+          console.error('❌ Failed to delete email:', err)
+          toast.error('Failed to delete email. Please try again.')
+        }
+      }
+    })
   }
 
   const handleFeedback = async (emailId, type) => {
@@ -316,79 +341,90 @@ function Dashboard() {
       return
     }
     
-    if (!window.confirm(`Are you sure you want to delete ${selectedEmails.length} email(s)?`)) {
-      return
-    }
-    
-    try {
-      const result = await bulkDeleteEmails(selectedEmails)
-      console.log('✅ Bulk delete result:', result)
-      
-      // Update storage saved stats
-      setStorageSaved(prev => ({
-        emailsDeleted: prev.emailsDeleted + result.results.successful,
-        mbSaved: prev.mbSaved + (result.results.successful * 0.05) // Estimate 50KB per email
-      }))
-      
-      // Clear selection
-      setSelectedEmails([])
-      
-      // Show success message
-      toast.success(`Successfully deleted ${result.results.successful} out of ${result.results.total} emails`)
-      
-      // Refresh emails and stats
-      fetchEmails()
-      fetchStats()
-    } catch (err) {
-      console.error('❌ Failed to bulk delete emails:', err)
-      toast.error('Failed to delete emails. Please try again.')
-    }
+    // Show confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Delete Multiple Emails',
+      description: `Are you sure you want to delete ${selectedEmails.length} email(s)? This action cannot be undone.`,
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const result = await bulkDeleteEmails(selectedEmails)
+          console.log('✅ Bulk delete result:', result)
+          
+          // Update storage saved stats
+          setStorageSaved(prev => ({
+            emailsDeleted: prev.emailsDeleted + result.results.successful,
+            mbSaved: prev.mbSaved + (result.results.successful * 0.05) // Estimate 50KB per email
+          }))
+          
+          // Clear selection
+          setSelectedEmails([])
+          
+          // Show success message
+          toast.success(`Successfully deleted ${result.results.successful} out of ${result.results.total} emails`)
+          
+          // Refresh emails and stats
+          fetchEmails()
+          fetchStats()
+        } catch (err) {
+          console.error('❌ Failed to bulk delete emails:', err)
+          toast.error('Failed to delete emails. Please try again.')
+        }
+      }
+    })
   }
   
   // Handle clean all phishing emails
   const handleCleanPhishing = async () => {
-    if (!window.confirm('Are you sure you want to delete ALL phishing emails?')) {
-      return
-    }
-    
-    try {
-      const result = await cleanPhishingEmails()
-      console.log('✅ Clean phishing result:', result)
-      
-      // Update storage saved stats
-      if (result.results.deleted > 0) {
-        setStorageSaved(prev => ({
-          emailsDeleted: prev.emailsDeleted + result.results.deleted,
-          mbSaved: prev.mbSaved + parseFloat(result.results.storageSaved.mb)
-        }))
-      }
-      
-      // Clear selection
-      setSelectedEmails([])
-      
-      // Show success message
-      if (result.results.deleted > 0) {
-        const shouldFetchMore = window.confirm(
-          `Successfully cleaned ${result.results.deleted} phishing email(s)!\nStorage saved: ${result.results.storageSaved.mb} MB\n\n` +
-          `Would you like to fetch more emails from Gmail to replace the deleted ones?`
-        )
-        
-        if (shouldFetchMore) {
-          // Auto-fetch more emails (skip confirmation since user already confirmed)
-          await handleFetchEmails(true)
-          return // handleFetchEmails already refreshes
+    // Show confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Delete All Phishing Emails',
+      description: 'Are you sure you want to delete ALL phishing emails? This will permanently remove all detected phishing emails from your inbox.',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const result = await cleanPhishingEmails()
+          console.log('✅ Clean phishing result:', result)
+          
+          // Update storage saved stats
+          if (result.results.deleted > 0) {
+            setStorageSaved(prev => ({
+              emailsDeleted: prev.emailsDeleted + result.results.deleted,
+              mbSaved: prev.mbSaved + parseFloat(result.results.storageSaved.mb)
+            }))
+          }
+          
+          // Clear selection
+          setSelectedEmails([])
+          
+          // Show success message
+          if (result.results.deleted > 0) {
+            toast.success(`Successfully cleaned ${result.results.deleted} phishing email(s)! Storage saved: ${result.results.storageSaved.mb} MB`)
+            
+            const shouldFetchMore = window.confirm(
+              `Would you like to fetch more emails from Gmail to replace the deleted ones?`
+            )
+            
+            if (shouldFetchMore) {
+              // Auto-fetch more emails (skip confirmation since user already confirmed)
+              await handleFetchEmails(true)
+              return // handleFetchEmails already refreshes
+            }
+          } else {
+            toast.info('No phishing emails found to clean.')
+          }
+          
+          // Refresh emails and stats
+          fetchEmails()
+          fetchStats()
+        } catch (err) {
+          console.error('❌ Failed to clean phishing emails:', err)
+          toast.error('Failed to clean phishing emails. Please try again.')
         }
-      } else {
-        toast.info('No phishing emails found to clean.')
       }
-      
-      // Refresh emails and stats
-      fetchEmails()
-      fetchStats()
-    } catch (err) {
-      console.error('❌ Failed to clean phishing emails:', err)
-      toast.error('Failed to clean phishing emails. Please try again.')
-    }
+    })
   }
 
   const handleLogout = async () => {
@@ -962,6 +998,34 @@ function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmDialog(prev => ({ ...prev, open: false }))
+                if (confirmDialog.onConfirm) {
+                  await confirmDialog.onConfirm()
+                }
+              }}
+              className={confirmDialog.variant === 'destructive' ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
   )
 }
 
