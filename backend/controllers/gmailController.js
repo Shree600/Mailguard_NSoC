@@ -87,9 +87,23 @@ const handleGmailCallback = async (req, res) => {
     // Exchange authorization code for tokens
     const tokens = await getTokensFromCode(code);
 
-    // Validate tokens
+    // Validate tokens - CRITICAL: Both access_token AND refresh_token are required
     if (!tokens.access_token) {
       throw new Error('Failed to receive access token from Google');
+    }
+
+    // CRITICAL: Refresh token is REQUIRED for long-term Gmail access
+    // Without it, user will lose Gmail connection after ~1 hour when access token expires
+    if (!tokens.refresh_token) {
+      console.error('❌ CRITICAL: No refresh token received from Google');
+      console.error('This usually happens when:');
+      console.error('  1. User previously authorized and refresh token already exists');
+      console.error('  2. OAuth prompt is not set to "consent"');
+      console.error('  3. User is testing with same account repeatedly');
+      
+      // Redirect with specific error
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(`${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('No refresh token received. Please revoke app access in Google Account settings and try again.')}`);
     }
 
     // Update user with Gmail tokens
@@ -97,7 +111,7 @@ const handleGmailCallback = async (req, res) => {
       userId,
       {
         gmailAccessToken: tokens.access_token,
-        gmailRefreshToken: tokens.refresh_token || null,
+        gmailRefreshToken: tokens.refresh_token, // Now guaranteed to exist
         gmailConnectedAt: new Date()
       },
       { new: true, select: '-passwordHash' } // Return updated user without password

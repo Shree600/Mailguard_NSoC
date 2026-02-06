@@ -21,6 +21,15 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
       throw new Error('User has not connected Gmail. Please authenticate first.');
     }
 
+    // CRITICAL: Validate refresh token exists
+    // Without refresh token, Gmail connection will fail after access token expires (~1 hour)
+    if (!user.gmailRefreshToken) {
+      const error = new Error('Gmail refresh token is missing. Please reconnect Gmail to restore long-term access.');
+      error.code = 401;
+      error.requiresReauth = true; // Flag for frontend to show reconnect button
+      throw error;
+    }
+
     // Create authenticated Gmail client with token refresh callback
     const gmail = getGmailClient(
       user.gmailAccessToken, 
@@ -116,10 +125,16 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
   } catch (error) {
     console.error('❌ Gmail fetch error:', error.message);
     
+    // Preserve requiresReauth flag if it exists (set by validation above)
+    if (error.requiresReauth) {
+      throw error; // Pass through with requiresReauth flag
+    }
+    
     // Provide helpful error messages based on error type
     if (error.code === 401 || error.code === 403) {
       const authError = new Error('Gmail authentication failed. Token may be expired. Please reconnect Gmail.');
       authError.code = 401;
+      authError.requiresReauth = true; // Flag for frontend
       throw authError;
     }
     
@@ -314,6 +329,14 @@ const getGmailAddress = async (user) => {
   try {
     if (!user.gmailAccessToken) {
       throw new Error('User has not connected Gmail');
+    }
+
+    // CRITICAL: Validate refresh token exists
+    if (!user.gmailRefreshToken) {
+      const error = new Error('Gmail refresh token is missing. Please reconnect Gmail.');
+      error.code = 401;
+      error.requiresReauth = true;
+      throw error;
     }
 
     // Create authenticated Gmail client with token refresh callback
