@@ -1,9 +1,14 @@
 /**
  * DASHBOARD PAGE
  * Main dashboard view after login
+ * 
+ * Performance Optimizations:
+ * - Lazy loading of heavy components (EmailTable, EmailStatsChart)
+ * - Suspense boundaries for progressive rendering
+ * - Optimized re-renders with useMemo and useCallback
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useUser, useClerk } from '@clerk/clerk-react'
 import { toast } from 'sonner'
 import {
@@ -17,10 +22,30 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus } from '../services/api'
-import EmailTable from '../components/EmailTable'
-import EmailStatsChart from '../components/EmailStatsChart'
+
+// Lazy load heavy components for better initial load performance
+const EmailTable = lazy(() => import('../components/EmailTable'))
+const EmailStatsChart = lazy(() => import('../components/EmailStatsChart'))
+
+// Eager load lightweight components
 import StatsCard from '../components/StatsCard'
 import { Mail, ShieldAlert, CheckCircle2, HardDrive } from 'lucide-react'
+
+// Component loading fallback
+function ComponentLoader() {
+  return (
+    <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-6">
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-800 rounded w-1/4"></div>
+        <div className="space-y-3">
+          <div className="h-4 bg-gray-800 rounded"></div>
+          <div className="h-4 bg-gray-800 rounded w-5/6"></div>
+          <div className="h-4 bg-gray-800 rounded w-4/6"></div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function Dashboard() {
   const { user } = useUser()
@@ -790,8 +815,10 @@ function Dashboard() {
           </div>
         )}
 
-        {/* Analytics Chart */}
-        <EmailStatsChart stats={stats} loading={statsLoading} />
+        {/* Analytics Chart - Lazy loaded */}
+        <Suspense fallback={<ComponentLoader />}>
+          <EmailStatsChart stats={stats} loading={statsLoading} />
+        </Suspense>
 
         {/* Filters and Search Section */}
         <div className="mb-6 bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-800 p-6">
@@ -989,16 +1016,18 @@ function Dashboard() {
           </button>
         </div>
 
-        {/* Email List */}
-        <EmailTable
-          emails={emails}
-          loading={emailsLoading}
-          onDelete={handleDelete}
-          onFeedback={handleFeedback}
-          selectedEmails={selectedEmails}
-          onSelectEmail={handleSelectEmail}
-          onSelectAll={handleSelectAll}
-        />
+        {/* Email List - Lazy loaded */}
+        <Suspense fallback={<ComponentLoader />}>
+          <EmailTable
+            emails={emails}
+            loading={emailsLoading}
+            onDelete={handleDelete}
+            onFeedback={handleFeedback}
+            selectedEmails={selectedEmails}
+            onSelectEmail={handleSelectEmail}
+            onSelectAll={handleSelectAll}
+          />
+        </Suspense>
 
         {/* Footer Note */}
         <div className="mt-8 text-center">
