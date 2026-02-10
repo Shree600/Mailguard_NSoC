@@ -37,24 +37,24 @@ function EmailTable({
   // Show loading state
   if (loading) {
     return (
-      <Card>
+      <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
-          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-6 w-32 bg-slate-700" />
         </CardHeader>
         <CardContent className="space-y-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center gap-4">
-              <Skeleton className="h-4 w-4 rounded" />
+              <Skeleton className="h-4 w-4 rounded bg-slate-700" />
               <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-4 w-3/4 bg-slate-700" />
+                <Skeleton className="h-3 w-1/2 bg-slate-700" />
               </div>
-              <Skeleton className="h-6 w-20 rounded-full" />
-              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-6 w-20 rounded-full bg-slate-700" />
+              <Skeleton className="h-4 w-12 bg-slate-700" />
               <div className="flex gap-2">
-                <Skeleton className="h-8 w-8 rounded" />
-                <Skeleton className="h-8 w-8 rounded" />
-                <Skeleton className="h-8 w-8 rounded" />
+                <Skeleton className="h-8 w-8 rounded bg-slate-700" />
+                <Skeleton className="h-8 w-8 rounded bg-slate-700" />
+                <Skeleton className="h-8 w-8 rounded bg-slate-700" />
               </div>
             </div>
           ))}
@@ -66,17 +66,17 @@ function EmailTable({
   // Show empty state
   if (!emails || emails.length === 0) {
     return (
-      <Card>
+      <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
-          <CardTitle>Email List</CardTitle>
+          <CardTitle className="text-slate-100">Email List</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-              <Inbox className="w-8 h-8 text-gray-400" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-700 rounded-full mb-4">
+              <Inbox className="w-8 h-8 text-slate-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No emails yet</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-lg font-semibold text-slate-100 mb-2">No emails yet</h3>
+            <p className="text-slate-400 mb-6">
               Connect your email account to start detecting phishing emails
             </p>
           </div>
@@ -87,12 +87,12 @@ function EmailTable({
 
   // Render email table
   return (
-    <Card>
+    <Card className="bg-slate-800 border-slate-700">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Email List</CardTitle>
+          <CardTitle className="text-slate-100">Email List</CardTitle>
           {selectedEmails.length > 0 && (
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-slate-400">
               {selectedEmails.length} email{selectedEmails.length !== 1 ? 's' : ''} selected
             </span>
           )}
@@ -101,24 +101,24 @@ function EmailTable({
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-gray-50 sticky top-0 z-10">
-              <TableRow>
-                <TableHead className="w-12">
+            <TableHeader className="bg-slate-900 sticky top-0 z-10 border-b border-slate-700">
+              <TableRow className="hover:bg-slate-900">
+                <TableHead className="w-12 text-slate-300">
                   <input
                     type="checkbox"
                     checked={selectedEmails.length === emails.length && emails.length > 0}
                     onChange={(e) => onSelectAll(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    className="w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
                     title="Select all emails"
                   />
                 </TableHead>
-                <TableHead className="min-w-[300px]">
+                <TableHead className="min-w-[300px] text-slate-300 font-semibold">
                   Subject
                 </TableHead>
-                <TableHead className="min-w-[200px]">From</TableHead>
-                <TableHead className="w-32">Status</TableHead>
-                <TableHead className="w-28">Confidence</TableHead>
-                <TableHead className="w-32 text-right">Actions</TableHead>
+                <TableHead className="min-w-[200px] text-slate-300 font-semibold">From</TableHead>
+                <TableHead className="w-32 text-slate-300 font-semibold">Status</TableHead>
+                <TableHead className="w-28 text-slate-300 font-semibold">Confidence</TableHead>
+                <TableHead className="w-32 text-right text-slate-300 font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -170,7 +170,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
   }
 
   return (
-    <TableRow className={isSelected ? 'bg-blue-50' : ''}>
+    <TableRow className={`transition-colors border-b border-slate-700 hover:bg-slate-700/50 ${isSelected ? 'bg-blue-500/10' : ''}`}>
       {/* Checkbox Column */}
       <TableCell>
         <input
@@ -180,20 +180,20 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
             e.stopPropagation()
             onSelect(email._id)
           }}
-          className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+          className="w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
         />
       </TableCell>
       
       {/* Subject Column */}
       <TableCell>
-        <div className="text-sm font-medium text-gray-900">
+        <div className="text-sm font-medium text-slate-100">
           {truncate(email.subject)}
         </div>
       </TableCell>
       
       {/* From Column */}
       <TableCell>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-slate-400">
           {truncate(email.sender || email.from, 30)}
         </div>
       </TableCell>
@@ -205,7 +205,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
       
       {/* Confidence Column */}
       <TableCell>
-        <div className="text-sm text-gray-900 font-medium">
+        <div className="text-sm text-slate-100 font-medium">
           {getConfidence()}
         </div>
       </TableCell>
@@ -218,7 +218,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
             variant="ghost"
             size="sm"
             onClick={() => onFeedback(email._id, 'correct')}
-            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+            className="h-8 w-8 p-0 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
             title="Mark as Correct"
           >
             <ThumbsUp className="h-4 w-4" />
@@ -229,7 +229,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
             variant="ghost"
             size="sm"
             onClick={() => onFeedback(email._id, 'wrong')}
-            className="h-8 w-8 p-0 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+            className="h-8 w-8 p-0 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
             title="Mark as Wrong"
           >
             <AlertTriangle className="h-4 w-4" />
@@ -241,7 +241,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
               variant="ghost"
               size="sm"
               onClick={() => onDelete(email._id)}
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="h-8 w-8 p-0 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
               title="Delete Email"
             >
               <Trash2 className="h-4 w-4" />
