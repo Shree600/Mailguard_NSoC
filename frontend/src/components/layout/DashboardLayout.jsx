@@ -16,13 +16,7 @@ export default function DashboardLayout({ children }) {
     <div className="min-h-screen bg-slate-900">
       {/* Top Header Bar */}
       <header className="h-16 border-b border-slate-700 bg-slate-800">
-        <div className="h-full flex items-center justify-between px-4 sm:px-6 max-w-[1920px] mx-auto">
-          {/* Left side - Logo and Brand */}
-          <div className="flex items-center gap-3">
-            <Logo className="w-8 h-8" />
-            <h1 className="font-bold text-lg text-slate-100">Mailguard</h1>
-          </div>
-
+        <div className="h-full flex items-center justify-end px-4 sm:px-6 max-w-[1920px] mx-auto">
           {/* Right side - User actions */}
           <div className="flex items-center gap-4">
             {/* Notifications */}
