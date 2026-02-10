@@ -1,6 +1,7 @@
 // Import Express router
 const express = require('express');
 const router = express.Router();
+const timeout = require('connect-timeout');
 
 // Import Gmail controller functions
 const {
@@ -30,7 +31,7 @@ const { invalidateCacheMiddleware } = require('../middleware/cacheMiddleware');
  * @header  Authorization: Bearer <token>
  * @returns Authorization URL to redirect user to Google consent screen
  */
-router.get('/auth', authMiddleware, syncUserMiddleware, initiateGmailAuth);
+router.get('/auth', timeout('30s'), authMiddleware, syncUserMiddleware, initiateGmailAuth);
 
 /**
  * @route   GET /api/gmail/callback
@@ -40,7 +41,7 @@ router.get('/auth', authMiddleware, syncUserMiddleware, initiateGmailAuth);
  * @query   state - State parameter containing userId
  * @returns Success message with user data
  */
-router.get('/callback', handleGmailCallback);
+router.get('/callback', timeout('30s'), handleGmailCallback);
 
 /**
  * @route   GET /api/gmail/status
@@ -49,7 +50,7 @@ router.get('/callback', handleGmailCallback);
  * @header  Authorization: Bearer <token>
  * @returns Gmail connection status
  */
-router.get('/status', authMiddleware, syncUserMiddleware, checkGmailStatus);
+router.get('/status', timeout('30s'), authMiddleware, syncUserMiddleware, checkGmailStatus);
 
 /**
  * @route   DELETE /api/gmail/disconnect
@@ -58,7 +59,7 @@ router.get('/status', authMiddleware, syncUserMiddleware, checkGmailStatus);
  * @header  Authorization: Bearer <token>
  * @returns Success message
  */
-router.delete('/disconnect', authMiddleware, syncUserMiddleware, disconnectGmail);
+router.delete('/disconnect', timeout('30s'), authMiddleware, syncUserMiddleware, disconnectGmail);
 
 /**
  * @route   POST /api/gmail/fetch
@@ -71,6 +72,7 @@ router.delete('/disconnect', authMiddleware, syncUserMiddleware, disconnectGmail
  * INVALIDATES: User cache after fetching new emails
  */
 router.post('/fetch', 
+  timeout('180s'), // 3 minute timeout for Gmail fetch (handles large email volumes)
   gmailFetchLimiter, 
   authMiddleware, 
   syncUserMiddleware, 

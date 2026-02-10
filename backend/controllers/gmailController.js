@@ -344,21 +344,29 @@ const fetchAndSaveEmails = async (req, res) => {
     const totalInDb = await Email.countDocuments({ userId: user._id });
     const shouldRefetch = savedCount > 0 && savedCount === fetchedEmails.length; // All were new
     
-    res.status(200).json({
-      success: true,
-      message: savedCount > 0 ? `Fetched ${savedCount} new emails!` : 'No new emails found',
-      data: {
-        fetched: fetchedEmails.length,
-        saved: savedCount,
-        duplicates: duplicateCount,
-        errors: errorCount,
-        totalInDatabase: totalInDb,
-        shouldRefetch: shouldRefetch // Suggest fetching more if we got all new
-      }
-    });
+    // Check if response has already been sent (e.g., by timeout middleware)
+    if (!res.headersSent) {
+      res.status(200).json({
+        success: true,
+        message: savedCount > 0 ? `Fetched ${savedCount} new emails!` : 'No new emails found',
+        data: {
+          fetched: fetchedEmails.length,
+          saved: savedCount,
+          duplicates: duplicateCount,
+          errors: errorCount,
+          totalInDatabase: totalInDb,
+          shouldRefetch: shouldRefetch // Suggest fetching more if we got all new
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Fetch and save error:', error);
+    
+    // Check if response has already been sent (e.g., by timeout middleware)
+    if (res.headersSent) {
+      return; // Exit early if response already sent
+    }
     
     // Handle specific error types with appropriate status codes
     if (error.code === 401 || error.message.includes('Token may be expired') || error.message.includes('authentication failed')) {

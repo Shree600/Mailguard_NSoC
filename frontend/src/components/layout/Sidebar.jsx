@@ -60,7 +60,7 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-screen bg-slate-800 border-r border-slate-700 transition-all duration-300",
+          "fixed left-0 top-0 z-40 h-screen bg-slate-800 border-r border-slate-700 transition-all duration-300",
           "lg:translate-x-0", // Always visible on large screens
           isOpen ? "translate-x-0" : "-translate-x-full", // Toggle on mobile
           collapsed ? "w-16" : "w-64"

@@ -59,9 +59,6 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 // MIDDLEWARE CONFIGURATION
 // ================================================
 
-// Request timeout protection (prevent hanging connections)
-app.use(timeout('30s'));
-
 // Security headers (XSS, clickjacking protection, etc.)
 app.use(helmet());
 
@@ -128,22 +125,22 @@ app.get('/', (req, res) => {
 });
 
 // Mount health check routes (no auth required for monitoring)
-app.use('/health', healthRoutes);
+app.use('/health', timeout('10s'), healthRoutes);
 
-// Mount Gmail OAuth routes
+// Mount Gmail OAuth routes (custom timeouts defined per-route)
 app.use('/api/gmail', gmailRoutes);
 
 // Mount email classification routes
-app.use('/api/emails', emailRoutes);
+app.use('/api/emails', timeout('60s'), emailRoutes); // 60s for classify operations
 
 // Mount feedback routes
-app.use('/api/feedback', feedbackRoutes);
+app.use('/api/feedback', timeout('30s'), feedbackRoutes);
 
 // Mount admin routes
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', timeout('30s'), adminRoutes);
 
 // Mount migration routes
-app.use('/api/migration', migrationRoutes);
+app.use('/api/migration', timeout('90s'), migrationRoutes); // 90s for migration operations
 
 // ================================================
 // ERROR HANDLING

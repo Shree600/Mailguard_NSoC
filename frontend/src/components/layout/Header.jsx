@@ -12,7 +12,7 @@ export default function Header({ onMenuClick }) {
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'User'
 
   return (
-    <header className="h-16 border-b border-slate-700 bg-slate-800 sticky top-0 z-30">
+    <header className="h-16 border-b border-slate-700 bg-slate-800 sticky top-0 z-20">
       <div className="h-full flex items-center justify-between px-4 sm:px-6">
         {/* Left side - Mobile menu + Search */}
         <div className="flex items-center gap-3 sm:gap-4 flex-1 max-w-md">
