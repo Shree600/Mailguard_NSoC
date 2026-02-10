@@ -348,7 +348,13 @@ exports.getClassifiedEmails = async (req, res) => {
         _id: 1,
         subject: 1,
         sender: 1,
-        body: { $substr: ['$body', 0, 200] }, // Truncate body
+        body: {
+          $cond: {
+            if: { $gte: [{ $strLenCP: '$body' }, 200] },
+            then: { $substrCP: ['$body', 0, 200] },
+            else: '$body'
+          }
+        }, // Truncate body safely with UTF-8 support
         receivedAt: 1,
         gmailId: 1,
         prediction: 1,

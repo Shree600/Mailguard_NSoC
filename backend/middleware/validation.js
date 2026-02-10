@@ -12,14 +12,19 @@ const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId form
 const emailQuerySchema = z.object({
   emailId: objectIdSchema.optional(),
   userId: objectIdSchema.optional(),
-  prediction: z.enum(['spam', 'phishing', 'safe', 'legitimate', 'unknown', 'pending']).optional(),
-  category: z.enum(['spam', 'phishing', 'safe', 'unknown']).optional(),
+  prediction: z.string().transform(val => val === '' ? undefined : val)
+    .pipe(z.enum(['spam', 'phishing', 'safe', 'legitimate', 'unknown', 'pending']).optional()),
+  category: z.string().transform(val => val === '' ? undefined : val)
+    .pipe(z.enum(['spam', 'phishing', 'safe', 'unknown']).optional()),
   limit: z.coerce.number().int().positive().max(100).default(50),
   page: z.coerce.number().int().positive().default(1),
   offset: z.coerce.number().int().nonnegative().optional(),
-  search: z.string().max(200).optional().transform(str => str ? escapeRegex(str) : str),
-  dateFrom: z.string().datetime().optional().or(z.string().length(0)),
-  dateTo: z.string().datetime().optional().or(z.string().length(0)),
+  search: z.string().transform(str => str === '' ? undefined : str).optional()
+    .transform(str => str ? escapeRegex(str) : str),
+  dateFrom: z.string().transform(val => val === '' ? undefined : val)
+    .pipe(z.string().datetime().optional()),
+  dateTo: z.string().transform(val => val === '' ? undefined : val)
+    .pipe(z.string().datetime().optional()),
   sortBy: z.enum(['receivedAt', 'subject', 'sender', 'prediction']).default('receivedAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
@@ -91,10 +96,10 @@ const validate = (schema, source = 'body') => {
         return res.status(400).json({
           success: false,
           message: 'Invalid request data',
-          errors: error.errors.map(err => ({
+          errors: error.errors?.map(err => ({
             field: err.path.join('.'),
             message: err.message,
-          })),
+          })) || [],
         });
       }
       next(error);
