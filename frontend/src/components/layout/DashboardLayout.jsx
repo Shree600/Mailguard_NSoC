@@ -11,7 +11,7 @@ export default function DashboardLayout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-900">
       {/* Sidebar */}
       <Sidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 

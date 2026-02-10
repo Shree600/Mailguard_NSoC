@@ -18,21 +18,25 @@ import Logo from '../Logo'
 
 const menuItems = [
   {
+    id: 'dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
     path: '/dashboard',
   },
   {
+    id: 'emails',
     label: 'Emails',
     icon: Mail,
     path: '/dashboard',
   },
   {
+    id: 'phishing',
     label: 'Phishing Detected',
     icon: ShieldAlert,
     path: '/dashboard?filter=phishing',
   },
   {
+    id: 'settings',
     label: 'Settings',
     icon: Settings,
     path: '/dashboard',
@@ -56,18 +60,18 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-screen bg-white border-r border-gray-200 transition-all duration-300",
+          "fixed left-0 top-0 z-50 h-screen bg-slate-800 border-r border-slate-700 transition-all duration-300",
           "lg:translate-x-0", // Always visible on large screens
           isOpen ? "translate-x-0" : "-translate-x-full", // Toggle on mobile
           collapsed ? "w-16" : "w-64"
         )}
       >
         {/* Logo section */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700">
           {!collapsed && (
             <div className="flex items-center gap-2">
               <Logo className="w-8 h-8" />
-              <span className="font-bold text-xl text-gray-900">Mailguard</span>
+              <span className="font-bold text-xl text-slate-100">Mailguard</span>
             </div>
           )}
           {collapsed && (
@@ -85,13 +89,13 @@ export default function Sidebar({ isOpen, onClose }) {
             
             return (
               <Link
-                key={item.path}
+                key={item.id}
                 to={item.path}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                    ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                    : "text-slate-300 hover:bg-slate-700 hover:text-slate-100"
                 )}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
@@ -104,12 +108,12 @@ export default function Sidebar({ isOpen, onClose }) {
         {/* Collapse toggle button */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute bottom-4 right-4 p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors hidden lg:block"
+          className="absolute bottom-4 right-4 p-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors hidden lg:block"
         >
           {collapsed ? (
-            <ChevronRight className="w-4 h-4 text-gray-700" />
+            <ChevronRight className="w-4 h-4 text-slate-300" />
           ) : (
-            <ChevronLeft className="w-4 h-4 text-gray-700" />
+            <ChevronLeft className="w-4 h-4 text-slate-300" />
           )}
         </button>
       </aside>
