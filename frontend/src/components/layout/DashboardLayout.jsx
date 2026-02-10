@@ -16,7 +16,13 @@ export default function DashboardLayout({ children }) {
     <div className="min-h-screen bg-slate-900">
       {/* Top Header Bar */}
       <header className="h-16 border-b border-slate-700 bg-slate-800">
-        <div className="h-full flex items-center justify-end px-4 sm:px-6 max-w-[1920px] mx-auto">
+        <div className="h-full flex items-center justify-between px-4 sm:px-6 max-w-[1920px] mx-auto">
+          {/* Left side - Branding */}
+          <div className="flex items-center gap-2">
+            <Logo className="w-8 h-8" />
+            <span className="font-bold text-xl text-slate-100">Mailguard</span>
+          </div>
+
           {/* Right side - User actions */}
           <div className="flex items-center gap-4">
             {/* Notifications */}
@@ -25,14 +31,8 @@ export default function DashboardLayout({ children }) {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
             </Button>
 
-            {/* User info */}
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-slate-100">{displayName}</p>
-                <p className="text-xs text-slate-400">Administrator</p>
-              </div>
-              <UserButton afterSignOutUrl="/login" />
-            </div>
+            {/* User Button */}
+            <UserButton afterSignOutUrl="/login" />
           </div>
         </div>
       </header>
