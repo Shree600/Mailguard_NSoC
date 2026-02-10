@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }) {
         <div className="h-full flex items-center justify-between px-4 sm:px-6 max-w-[1920px] mx-auto">
           {/* Left side - Branding */}
           <div className="flex items-center gap-2">
-            <Logo className="w-8 h-8" />
+            <Logo className="w-8 h-8" showText={false} />
             <span className="font-bold text-xl text-slate-100">Mailguard</span>
           </div>
 
