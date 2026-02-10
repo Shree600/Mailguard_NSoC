@@ -20,10 +20,7 @@ export default function DashboardLayout({ children }) {
           {/* Left side - Logo and Brand */}
           <div className="flex items-center gap-3">
             <Logo className="w-8 h-8" />
-            <div>
-              <h1 className="font-bold text-lg text-slate-100">Mailguard</h1>
-              <p className="text-xs text-slate-400">AI Phishing Shield</p>
-            </div>
+            <h1 className="font-bold text-lg text-slate-100">Mailguard</h1>
           </div>
 
           {/* Right side - User actions */}

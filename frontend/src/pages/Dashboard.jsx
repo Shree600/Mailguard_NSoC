@@ -575,16 +575,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* Welcome Section */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-100 mb-2">
-          Welcome back, {displayName}! 👋
-        </h1>
-        <p className="text-sm sm:text-base text-slate-400">
-          Here's your email security overview
-        </p>
-      </div>
         
         {/* Gmail Connection Section */}
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 sm:p-6 transition-all duration-300 hover:border-slate-600 hover:shadow-lg hover:shadow-blue-500/5">
