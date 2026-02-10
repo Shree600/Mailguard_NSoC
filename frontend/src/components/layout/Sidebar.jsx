@@ -52,7 +52,7 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* Mobile overlay - only show when menu is open */}
       {isOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black/50 z-40" 
+          className="lg:hidden fixed inset-0 bg-black/50 z-30" 
           onClick={onClose}
         />
       )}
