@@ -32,7 +32,22 @@ export default function DashboardLayout({ children }) {
             </Button>
 
             {/* User Button */}
-            <UserButton afterSignOutUrl="/login" />
+            <UserButton 
+              afterSignOutUrl="/login"
+              appearance={{
+                elements: {
+                  avatarBox: "w-8 h-8",
+                  userButtonAvatarBox: "w-8 h-8",
+                  userButtonTrigger: "focus:shadow-none"
+                },
+                variables: {
+                  colorPrimary: "#3b82f6",
+                  colorText: "#ffffff",
+                  colorTextSecondary: "#cbd5e1",
+                  colorBackground: "#1e293b"
+                }
+              }}
+            />
           </div>
         </div>
       </header>
