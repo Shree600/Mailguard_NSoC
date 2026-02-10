@@ -37,24 +37,24 @@ function EmailTable({
   // Show loading state
   if (loading) {
     return (
-      <Card className="bg-slate-800 border-slate-700">
+      <Card className="bg-white border-gray-200">
         <CardHeader>
-          <Skeleton className="h-6 w-32 bg-slate-700" />
+          <Skeleton className="h-6 w-32 bg-gray-100" />
         </CardHeader>
         <CardContent className="space-y-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center gap-4">
-              <Skeleton className="h-4 w-4 rounded bg-slate-700" />
+              <Skeleton className="h-4 w-4 rounded bg-gray-100" />
               <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4 bg-slate-700" />
-                <Skeleton className="h-3 w-1/2 bg-slate-700" />
+                <Skeleton className="h-4 w-3/4 bg-gray-100" />
+                <Skeleton className="h-3 w-1/2 bg-gray-100" />
               </div>
-              <Skeleton className="h-6 w-20 rounded-full bg-slate-700" />
-              <Skeleton className="h-4 w-12 bg-slate-700" />
+              <Skeleton className="h-6 w-20 rounded-full bg-gray-100" />
+              <Skeleton className="h-4 w-12 bg-gray-100" />
               <div className="flex gap-2">
-                <Skeleton className="h-8 w-8 rounded bg-slate-700" />
-                <Skeleton className="h-8 w-8 rounded bg-slate-700" />
-                <Skeleton className="h-8 w-8 rounded bg-slate-700" />
+                <Skeleton className="h-8 w-8 rounded bg-gray-100" />
+                <Skeleton className="h-8 w-8 rounded bg-gray-100" />
+                <Skeleton className="h-8 w-8 rounded bg-gray-100" />
               </div>
             </div>
           ))}
@@ -66,13 +66,13 @@ function EmailTable({
   // Show empty state
   if (!emails || emails.length === 0) {
     return (
-      <Card className="bg-slate-800 border-slate-700">
+      <Card className="bg-white border-gray-200">
         <CardHeader>
           <CardTitle className="text-slate-100">Email List</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-700 rounded-full mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
               <Inbox className="w-8 h-8 text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-100 mb-2">No emails yet</h3>
@@ -87,7 +87,7 @@ function EmailTable({
 
   // Render email table
   return (
-    <Card className="bg-slate-800 border-slate-700">
+    <Card className="bg-white border-gray-200">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-slate-100">Email List</CardTitle>
@@ -101,14 +101,14 @@ function EmailTable({
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-slate-900 sticky top-0 z-10 border-b border-slate-700">
+            <TableHeader className="bg-slate-900 sticky top-0 z-10 border-b border-gray-200">
               <TableRow className="hover:bg-slate-900">
                 <TableHead className="w-12 text-slate-300">
                   <input
                     type="checkbox"
                     checked={selectedEmails.length === emails.length && emails.length > 0}
                     onChange={(e) => onSelectAll(e.target.checked)}
-                    className="w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    className="w-4 h-4 text-blue-500 bg-gray-100 border-slate-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
                     title="Select all emails"
                   />
                 </TableHead>
@@ -170,7 +170,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
   }
 
   return (
-    <TableRow className={`transition-colors border-b border-slate-700 hover:bg-slate-700/50 ${isSelected ? 'bg-blue-500/10' : ''}`}>
+    <TableRow className={`transition-colors border-b border-gray-200 hover:bg-gray-100/50 ${isSelected ? 'bg-blue-500/10' : ''}`}>
       {/* Checkbox Column */}
       <TableCell>
         <input
@@ -180,7 +180,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
             e.stopPropagation()
             onSelect(email._id)
           }}
-          className="w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+          className="w-4 h-4 text-blue-500 bg-gray-100 border-slate-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
         />
       </TableCell>
       

@@ -20,13 +20,13 @@ export default function StatsCard({
 }) {
   if (loading) {
     return (
-      <Card className={cn("overflow-hidden bg-slate-800 border-slate-700", className)}>
+      <Card className={cn("overflow-hidden bg-white border-gray-200", className)}>
         <CardContent className="p-6">
           <div className="space-y-4">
-            <Skeleton className="h-12 w-12 rounded-xl bg-slate-700" />
+            <Skeleton className="h-12 w-12 rounded-xl bg-gray-100" />
             <div className="space-y-2">
-              <Skeleton className="h-9 w-24 bg-slate-700" />
-              <Skeleton className="h-4 w-32 bg-slate-700" />
+              <Skeleton className="h-9 w-24 bg-gray-100" />
+              <Skeleton className="h-4 w-32 bg-gray-100" />
             </div>
           </div>
         </CardContent>
@@ -36,8 +36,8 @@ export default function StatsCard({
 
   return (
     <Card className={cn(
-      "overflow-hidden bg-slate-800 border-slate-700 transition-all duration-300",
-      "hover:bg-slate-800/80 hover:border-slate-600 hover:shadow-xl hover:shadow-blue-500/10",
+      "overflow-hidden bg-white border-gray-200 transition-all duration-300",
+      "hover:bg-white/80 hover:border-gray-300 hover:shadow-xl hover:shadow-blue-500/10",
       "group cursor-default",
       className
     )}>
