@@ -34,13 +34,13 @@ import { Mail, ShieldAlert, CheckCircle2, HardDrive } from 'lucide-react'
 // Component loading fallback
 function ComponentLoader() {
   return (
-    <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-6">
+    <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
       <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-800 rounded w-1/4"></div>
+        <div className="h-8 bg-slate-700 rounded w-1/4"></div>
         <div className="space-y-3">
-          <div className="h-4 bg-gray-800 rounded"></div>
-          <div className="h-4 bg-gray-800 rounded w-5/6"></div>
-          <div className="h-4 bg-gray-800 rounded w-4/6"></div>
+          <div className="h-4 bg-slate-700 rounded"></div>
+          <div className="h-4 bg-slate-700 rounded w-5/6"></div>
+          <div className="h-4 bg-slate-700 rounded w-4/6"></div>
         </div>
       </div>
     </div>
