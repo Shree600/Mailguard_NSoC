@@ -821,9 +821,9 @@ function Dashboard() {
         </Suspense>
 
         {/* Filters and Search Section */}
-        <div className="mb-6 bg-gray-900/40 backdrop-blur-sm rounded-xl border border-gray-800 p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mb-6 bg-slate-800 rounded-xl border border-slate-700 p-6 transition-all duration-300 hover:border-slate-600">
+          <h3 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
             Filters & Search
@@ -832,7 +832,7 @@ function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Search Input */}
             <div className="lg:col-span-2">
-              <label className="block text-sm font-medium text-gray-400 mb-2">Search</label>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Search</label>
               <input
                 type="text"
                 placeholder="Search subject, sender, or body..."
@@ -841,20 +841,20 @@ function Dashboard() {
                   setFilters({ ...filters, search: e.target.value, page: 1 })
                 }}
                 onKeyPress={(e) => e.key === 'Enter' && fetchEmails()}
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
 
             {/* Classification Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Type</label>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Type</label>
               <select
                 value={filters.prediction}
                 onChange={(e) => {
                   setFilters({ ...filters, prediction: e.target.value, page: 1 })
                   fetchEmails({ prediction: e.target.value, page: 1 })
                 }}
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               >
                 <option value="">All Emails</option>
                 <option value="phishing">🚨 Phishing</option>
@@ -865,14 +865,14 @@ function Dashboard() {
 
             {/* Items Per Page */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Per Page</label>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Per Page</label>
               <select
                 value={filters.limit}
                 onChange={(e) => {
                   setFilters({ ...filters, limit: parseInt(e.target.value), page: 1 })
                   fetchEmails({ limit: parseInt(e.target.value), page: 1 })
                 }}
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               >
                 <option value="10">10</option>
                 <option value="25">25</option>
@@ -885,21 +885,21 @@ function Dashboard() {
           {/* Date Range Filters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">From Date</label>
+              <label className="block text-sm font-medium text-slate-400 mb-2">From Date</label>
               <input
                 type="date"
                 value={filters.dateFrom}
                 onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value, page: 1 })}
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">To Date</label>
+              <label className="block text-sm font-medium text-slate-400 mb-2">To Date</label>
               <input
                 type="date"
                 value={filters.dateTo}
                 onChange={(e) => setFilters({ ...filters, dateTo: e.target.value, page: 1 })}
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
           </div>
@@ -908,7 +908,7 @@ function Dashboard() {
           <div className="mt-4 flex gap-3">
             <button
               onClick={() => fetchEmails()}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition duration-200"
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30"
             >
               Apply Filters
             </button>
@@ -933,7 +933,7 @@ function Dashboard() {
                   dateTo: ''
                 })
               }}
-              className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition duration-200"
+              className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg font-semibold transition-all duration-200 border border-slate-600"
             >
               Reset
             </button>
@@ -941,8 +941,8 @@ function Dashboard() {
 
           {/* Pagination Info */}
           {pagination.total > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between">
-              <div className="text-sm text-gray-400">
+            <div className="mt-4 pt-4 border-t border-slate-700 flex items-center justify-between">
+              <div className="text-sm text-slate-400">
                 Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} emails
               </div>
               <div className="flex gap-2">
@@ -953,15 +953,15 @@ function Dashboard() {
                     fetchEmails({ page: newPage })
                   }}
                   disabled={!pagination.hasPrev}
-                  className={`px-4 py-2 rounded-lg font-semibold transition duration-200 ${
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${
                     pagination.hasPrev
-                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                      : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                      ? 'bg-slate-700 hover:bg-slate-600 text-slate-100 border border-slate-600'
+                      : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                   }`}
                 >
                   ← Previous
                 </button>
-                <div className="px-4 py-2 bg-gray-800 rounded-lg text-white">
+                <div className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100">
                   Page {pagination.page} of {pagination.totalPages}
                 </div>
                 <button
@@ -971,10 +971,10 @@ function Dashboard() {
                     fetchEmails({ page: newPage })
                   }}
                   disabled={!pagination.hasNext}
-                  className={`px-4 py-2 rounded-lg font-semibold transition duration-200 ${
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${
                     pagination.hasNext
-                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                      : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                      ? 'bg-slate-700 hover:bg-slate-600 text-slate-100 border border-slate-600'
+                      : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                   }`}
                 >
                   Next →
@@ -990,10 +990,10 @@ function Dashboard() {
           <button
             onClick={handleBulkDelete}
             disabled={selectedEmails.length === 0}
-            className={`px-4 sm:px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 min-h-[44px] text-sm sm:text-base ${
+            className={`px-4 sm:px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center space-x-2 min-h-[44px] text-sm sm:text-base ${
               selectedEmails.length > 0
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20'
+                : 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
             }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1006,7 +1006,7 @@ function Dashboard() {
           {/* Clean All Phishing Button */}
           <button
             onClick={handleCleanPhishing}
-            className="px-4 sm:px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition duration-200 flex items-center space-x-2 min-h-[44px] text-sm sm:text-base"
+            className="px-4 sm:px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-semibold transition-all duration-200 flex items-center space-x-2 min-h-[44px] text-sm sm:text-base shadow-lg shadow-rose-600/20"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1031,7 +1031,7 @@ function Dashboard() {
 
         {/* Footer Note */}
         <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             🤖 Powered by AI • Phase 6 - Gmail Actions & Automation Complete
           </p>
         </div>
