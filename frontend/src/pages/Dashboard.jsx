@@ -776,8 +776,8 @@ function Dashboard() {
             value={stats.total}
             icon={Mail}
             loading={statsLoading}
-            iconColor="text-blue-600"
-            iconBgColor="bg-blue-50"
+            iconColor="text-blue-400"
+            iconBgColor="bg-blue-500/10"
           />
 
           <StatsCard
@@ -785,8 +785,8 @@ function Dashboard() {
             value={stats.phishing}
             icon={ShieldAlert}
             loading={statsLoading}
-            iconColor="text-red-600"
-            iconBgColor="bg-red-50"
+            iconColor="text-rose-400"
+            iconBgColor="bg-rose-500/10"
           />
 
           <StatsCard
@@ -794,8 +794,8 @@ function Dashboard() {
             value={stats.safe}
             icon={CheckCircle2}
             loading={statsLoading}
-            iconColor="text-green-600"
-            iconBgColor="bg-green-50"
+            iconColor="text-emerald-400"
+            iconBgColor="bg-emerald-500/10"
           />
 
           <StatsCard
@@ -803,8 +803,8 @@ function Dashboard() {
             value={`${storageSaved.mbSaved.toFixed(2)} MB`}
             icon={HardDrive}
             loading={statsLoading}
-            iconColor="text-purple-600"
-            iconBgColor="bg-purple-50"
+            iconColor="text-purple-400"
+            iconBgColor="bg-purple-500/10"
           />
         </div>
 

@@ -20,13 +20,13 @@ export default function StatsCard({
 }) {
   if (loading) {
     return (
-      <Card className={cn("overflow-hidden", className)}>
+      <Card className={cn("overflow-hidden bg-slate-800 border-slate-700", className)}>
         <CardContent className="p-6">
           <div className="space-y-4">
-            <Skeleton className="h-10 w-10 rounded-lg" />
+            <Skeleton className="h-12 w-12 rounded-xl bg-slate-700" />
             <div className="space-y-2">
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-9 w-24 bg-slate-700" />
+              <Skeleton className="h-4 w-32 bg-slate-700" />
             </div>
           </div>
         </CardContent>
@@ -35,19 +35,27 @@ export default function StatsCard({
   }
 
   return (
-    <Card className={cn("overflow-hidden hover:shadow-lg transition-shadow", className)}>
+    <Card className={cn(
+      "overflow-hidden bg-slate-800 border-slate-700 transition-all duration-300",
+      "hover:bg-slate-800/80 hover:border-slate-600 hover:shadow-xl hover:shadow-blue-500/10",
+      "group cursor-default",
+      className
+    )}>
       <CardContent className="p-6">
         {/* Icon */}
-        <div className={cn("inline-flex p-3 rounded-lg mb-4", iconBgColor)}>
+        <div className={cn(
+          "inline-flex p-3 rounded-xl mb-4 transition-transform duration-300 group-hover:scale-110",
+          iconBgColor
+        )}>
           <Icon className={cn("w-6 h-6", iconColor)} />
         </div>
 
         {/* Value */}
         <div className="space-y-1">
-          <h3 className="text-3xl font-bold text-gray-900">
+          <h3 className="text-3xl font-bold text-slate-100 tracking-tight">
             {value}
           </h3>
-          <p className="text-sm text-gray-600 font-medium">
+          <p className="text-sm text-slate-400 font-medium">
             {title}
           </p>
         </div>
@@ -56,7 +64,7 @@ export default function StatsCard({
         {trend && trendValue && (
           <div className={cn(
             "mt-4 flex items-center gap-1 text-sm font-medium",
-            trend === 'up' ? 'text-green-600' : 'text-red-600'
+            trend === 'up' ? 'text-emerald-400' : 'text-rose-400'
           )}>
             {trend === 'up' ? (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
