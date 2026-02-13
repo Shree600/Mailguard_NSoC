@@ -269,8 +269,20 @@ const fetchAndSaveEmails = async (req, res) => {
       });
     }
 
-    // Build Gmail search query
+    // Build Gmail search query - FETCH RECENT EMAILS (last 30 days by default)
     let gmailSearchQuery = 'in:inbox';
+    
+    // DEFAULT: Fetch only emails from last 30 days for better real-time experience
+    // User can override with custom date filters
+    if (!dateFrom && !dateTo) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const year = thirtyDaysAgo.getFullYear();
+      const month = thirtyDaysAgo.getMonth() + 1;
+      const day = thirtyDaysAgo.getDate();
+      gmailSearchQuery += ` after:${year}/${month}/${day}`;
+      console.log(`📅 Filtering emails: Last 30 days (after ${year}/${month}/${day})`);
+    }
     
     // Add date filters if provided
     if (dateFrom) {
@@ -286,6 +298,10 @@ const fetchAndSaveEmails = async (req, res) => {
     if (query) {
       gmailSearchQuery += ` ${query}`;
     }
+    
+    // Add "newer_than:3d" for even more recent focus
+    // Uncomment if you want only last 3 days:
+    // gmailSearchQuery += ' newer_than:3d';
     
     // Fetch emails from Gmail using service
     let fetchedEmails;

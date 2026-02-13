@@ -71,4 +71,12 @@ router.post('/clean-phishing',
   emailController.cleanPhishingEmails
 );
 
+// Clear all emails from database
+// INVALIDATES: User cache after clearing all emails
+router.post('/clear-all', 
+  bulkOperationLimiter, 
+  invalidateCacheMiddleware(), // Clear user cache after clear
+  emailController.clearAllEmails
+);
+
 module.exports = router;

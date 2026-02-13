@@ -575,24 +575,30 @@ const deleteEmail = async (gmailId, accessToken, refreshToken) => {
 
     console.log(`🗑️  Attempting to delete Gmail message: ${gmailId}`);
 
-    // Create authenticated Gmail client
-    // Note: No token refresh callback for delete operations since we don't have user object
-    // Token refresh will be handled by other operations (fetch, etc.)
-    const gmail = getGmailClient(accessToken, refreshToken, null);
+    // Create authenticated Gmail client with auth error handling
+    const gmail = getGmailClient(
+      accessToken, 
+      refreshToken, 
+      null, // No token refresh callback for delete (we don't have user context)
+      (authError) => {
+        console.error('❌ Gmail Auth Error during deletion:', authError.message);
+      }
+    );
 
     // Delete the email using Gmail API
-    // Note: This permanently deletes the email (not just trash)
-    await gmail.users.messages.delete({
+    // Note: This moves email to trash (use trash) instead of permanent delete
+    // Gmail API: messages.trash() moves to trash, messages.delete() permanently deletes
+    await gmail.users.messages.trash({
       userId: 'me',
       id: gmailId,
     });
 
-    console.log(`✅ Successfully deleted Gmail message: ${gmailId}`);
+    console.log(`✅ Successfully moved Gmail message to trash: ${gmailId}`);
 
     return {
       success: true,
       gmailId: gmailId,
-      message: 'Email deleted successfully from Gmail',
+      message: 'Email moved to trash successfully',
     };
 
   } catch (error) {

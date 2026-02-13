@@ -610,7 +610,58 @@ exports.bulkDeleteEmails = async (req, res) => {
     });
   }
 };
+/**
+ * Clear ALL emails from database (for user only)
+ * POST /api/emails/clear-all
+ * Removes all emails and classifications for security/privacy or to start fresh
+ */
+exports.clearAllEmails = async (req, res) => {
+  try {
+    const userId = req.mongoUserId;
+    
+    console.log(`🗑️ Clearing all emails for user: ${userId}`);
 
+    // Count before deletion
+    const emailCount = await Email.countDocuments({ userId });
+    
+    if (emailCount === 0) {
+      return res.json({
+        success: true,
+        message: 'No emails to clear',
+        deleted: 0
+      });
+    }
+
+    // Get all email IDs for this user
+    const emails = await Email.find({ userId }).select('_id');
+    const emailIds = emails.map(e => e._id);
+
+    // Delete all classifications for these emails
+    const classificationResult = await Classification.deleteMany({ 
+      emailId: { $in: emailIds } 
+    });
+
+    // Delete all emails
+    const emailResult = await Email.deleteMany({ userId });
+
+    console.log(`✅ Cleared ${emailResult.deletedCount} emails and ${classificationResult.deletedCount} classifications`);
+
+    res.json({
+      success: true,
+      message: `Successfully cleared ${emailResult.deletedCount} emails`,
+      deleted: emailResult.deletedCount,
+      classificationsDeleted: classificationResult.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Error clearing all emails:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear emails',
+      details: error.message
+    });
+  }
+};
 /**
  * Auto clean all phishing emails
  * POST /api/emails/clean-phishing

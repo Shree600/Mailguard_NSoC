@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus } from '../services/api'
+import { getEmailStats, getEmails, deleteEmail, bulkDeleteEmails, cleanPhishingEmails, clearAllEmails, submitFeedback, initiateGmailAuth, fetchGmailEmails, classifyEmails, migrateEmails, getMigrationStatus } from '../services/api'
 
 // Lazy load heavy components for better initial load performance
 const EmailTable = lazy(() => import('../components/EmailTable'))
@@ -461,6 +461,30 @@ function Dashboard() {
     if (window.confirm('Are you sure you want to logout?')) {
       await signOut()
     }
+  }
+  
+  // Handle clearing all emails from database
+  const handleClearAllEmails = () => {
+    setConfirmDialog({
+      open: true,
+      title: '⚠️ Clear All Emails',
+      description: 'This will permanently delete ALL emails from the database (not from Gmail). This action cannot be undone. Are you sure?',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const result = await clearAllEmails()
+          console.log('✅ All emails cleared:', result)
+          toast.success(`Successfully cleared ${result.deleted} email(s) from database`)
+          
+          // Refresh
+          fetchEmails()
+          fetchStats()
+        } catch (err) {
+          console.error('❌ Failed to clear all emails:', err)
+          toast.error('Failed to clear emails. Please try again.')
+        }
+      }
+    })
   }
   
   // Handle Gmail connection
@@ -1002,6 +1026,18 @@ function Dashboard() {
             </svg>
             <span className="hidden sm:inline">🧹 Clean All Phishing</span>
             <span className="sm:hidden">🧹 Clean</span>
+          </button>
+          
+          {/* Clear All Emails Button */}
+          <button
+            onClick={handleClearAllEmails}
+            className="px-4 sm:px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition-all duration-200 flex items-center space-x-2 min-h-[44px] text-sm sm:text-base shadow-lg shadow-purple-600/20"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="hidden sm:inline">🔄 Clear All Emails</span>
+            <span className="sm:hidden">🔄 Clear</span>
           </button>
         </div>
 

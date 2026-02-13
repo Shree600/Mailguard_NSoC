@@ -187,6 +187,20 @@ export const cleanPhishingEmails = async () => {
   }
 }
 
+/**
+ * Clear ALL emails from database (fresh start)
+ * @returns {Promise} Results object with deletion count
+ */
+export const clearAllEmails = async () => {
+  try {
+    const response = await api.post('/emails/clear-all')
+    return response.data
+  } catch (error) {
+    console.error('❌ Failed to clear all emails:', error)
+    throw error
+  }
+}
+
 // ================================
 // FEEDBACK ENDPOINTS
 // ================================
