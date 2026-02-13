@@ -236,6 +236,36 @@ export const getFeedback = async () => {
   }
 }
 
+// REINFORCEMENT LEARNING / ADMIN ENDPOINTS
+
+/**
+ * Trigger manual model retraining
+ * @returns {Promise} Retraining result
+ */
+export const triggerRetrain = async () => {
+  try {
+    const response = await api.post('/admin/retrain', {}, { timeout: 300000 }) // 5 min timeout
+    return response.data
+  } catch (error) {
+    console.error('❌ Failed to trigger retrain:', error)
+    throw error
+  }
+}
+
+/**
+ * Get model/retraining status
+ * @returns {Promise} Status information
+ */
+export const getRetrainStatus = async () => {
+  try {
+    const response = await api.get('/admin/retrain/status')
+    return response.data
+  } catch (error) {
+    console.error('❌ Failed to get retrain status:', error)
+    throw error
+  }
+}
+
 // ================================
 // GMAIL INTEGRATION
 // ================================
