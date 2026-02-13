@@ -82,9 +82,10 @@ const getTokensFromCode = async (code) => {
  * @param {string} accessToken - User's access token
  * @param {string} refreshToken - User's refresh token
  * @param {Function} onTokensRefreshed - Optional callback when tokens are auto-refreshed
+ * @param {Function} onAuthError - Optional callback when authentication fails (invalid_grant, etc.)
  * @returns {gmail_v1.Gmail} Authenticated Gmail API client
  */
-const getGmailClient = (accessToken, refreshToken, onTokensRefreshed = null) => {
+const getGmailClient = (accessToken, refreshToken, onTokensRefreshed = null, onAuthError = null) => {
   const oauth2Client = createOAuth2Client();
 
   // Set credentials (tokens) on the OAuth2 client
@@ -107,6 +108,27 @@ const getGmailClient = (accessToken, refreshToken, onTokensRefreshed = null) => 
       });
     });
   }
+
+  // CRITICAL: Intercept OAuth errors (like invalid_grant) and provide callback
+  // This allows the calling code to handle authentication failures gracefully
+  const originalRequest = oauth2Client.request.bind(oauth2Client);
+  oauth2Client.request = async function(opts, callback) {
+    try {
+      return await originalRequest(opts, callback);
+    } catch (error) {
+      // Check for invalid_grant or other auth errors
+      if (error.message && error.message.includes('invalid_grant')) {
+        console.error('❌ OAuth Error: invalid_grant - Refresh token is invalid, expired, or revoked');
+        if (onAuthError) {
+          onAuthError({
+            error: 'invalid_grant',
+            message: 'Your Gmail connection has expired. Please reconnect your Gmail account.'
+          });
+        }
+      }
+      throw error;
+    }
+  };
 
   // Create and return Gmail API client
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client });

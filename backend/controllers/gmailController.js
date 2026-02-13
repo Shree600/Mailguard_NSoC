@@ -288,7 +288,23 @@ const fetchAndSaveEmails = async (req, res) => {
     }
     
     // Fetch emails from Gmail using service
-    const fetchedEmails = await fetchEmails(user, validatedMax, gmailSearchQuery);
+    let fetchedEmails;
+    try {
+      fetchedEmails = await fetchEmails(user, validatedMax, gmailSearchQuery);
+    } catch (fetchError) {
+      // Handle authentication errors specifically
+      if (fetchError.requiresReauth || fetchError.authError === 'invalid_grant') {
+        return res.status(401).json({
+          success: false,
+          message: fetchError.message,
+          requiresReauth: true,
+          authError: fetchError.authError || 'token_expired',
+          action: 'Please reconnect your Gmail account by going to Settings > Connected Accounts'
+        });
+      }
+      // Re-throw other errors to be caught by outer catch block
+      throw fetchError;
+    }
 
     if (fetchedEmails.length === 0) {
       return res.status(200).json({

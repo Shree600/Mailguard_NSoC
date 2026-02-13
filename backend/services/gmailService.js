@@ -30,6 +30,10 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
       throw error;
     }
 
+    console.log(`🔐 Authenticating with Gmail for user: ${user.email}`);
+    console.log(`   Access Token: ${user.gmailAccessToken ? '✓ Present' : '✗ Missing'}`);
+    console.log(`   Refresh Token: ${user.gmailRefreshToken ? '✓ Present' : '✗ Missing'}`);
+
     // Create authenticated Gmail client with token refresh callback
     const gmail = getGmailClient(
       user.gmailAccessToken, 
@@ -44,6 +48,21 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
           console.log(`✅ Updated refreshed tokens for user: ${user.email}`);
         } catch (error) {
           console.error('❌ Failed to save refreshed tokens:', error.message);
+        }
+      },
+      async (authError) => {
+        // Handle authentication errors (invalid_grant, etc.)
+        console.error(`❌ Gmail OAuth Error for ${user.email}:`, authError.message);
+        // Clear invalid tokens from database
+        try {
+          await User.findByIdAndUpdate(user._id, {
+            gmailAccessToken: null,
+            gmailRefreshToken: null,
+            gmailConnectedAt: null
+          });
+          console.log(`🧹 Cleared invalid tokens for user: ${user.email}`);
+        } catch (error) {
+          console.error('❌ Failed to clear invalid tokens:', error.message);
         }
       }
     );
@@ -227,10 +246,32 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
 
   } catch (error) {
     console.error('❌ Gmail fetch error:', error.message);
+    console.error('   Error details:', {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+      type: error.constructor.name
+    });
     
     // Preserve requiresReauth flag if it exists (set by validation above)
     if (error.requiresReauth) {
       throw error; // Pass through with requiresReauth flag
+    }
+    
+    // Handle invalid_grant specifically (expired/revoked refresh token)
+    if (error.message && error.message.includes('invalid_grant')) {
+      console.error('🚨 Invalid grant error: Refresh token is expired, revoked, or invalid');
+      console.error('   This usually means:');
+      console.error('   1. User revoked access to the app');
+      console.error('   2. Refresh token expired (unused for 6+ months)');
+      console.error('   3. User changed their Google password');
+      console.error('   4. Token limit exceeded (>50 tokens per user)');
+      
+      const invalidGrantError = new Error('Gmail connection has expired or been revoked. Please reconnect your Gmail account.');
+      invalidGrantError.code = 401;
+      invalidGrantError.requiresReauth = true;
+      invalidGrantError.authError = 'invalid_grant';
+      throw invalidGrantError;
     }
     
     // Provide helpful error messages based on error type
