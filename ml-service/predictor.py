@@ -2,6 +2,7 @@
 # Loads ML model and vectorizer once at startup
 
 import os
+import sys
 import joblib
 import numpy as np
 import json  # NEW: For metadata loading
@@ -9,6 +10,17 @@ import time  # NEW: For performance timing
 import asyncio  # NEW: For async support
 from datetime import datetime  # NEW: For timestamps
 from concurrent.futures import ThreadPoolExecutor  # NEW: For async predictions
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from prediction_cache import init_cache, get_cache  # NEW: Prediction caching

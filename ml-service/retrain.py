@@ -25,6 +25,18 @@ import numpy as np
 import joblib
 from datetime import datetime
 
+# Fix Windows console encoding for Unicode characters
+if sys.platform == 'win32':
+    try:
+        # Set UTF-8 encoding for stdout
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # Python 3.6 and earlier
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
 # Machine learning imports
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier

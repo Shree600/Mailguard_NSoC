@@ -1,0 +1,12 @@
+{
+  "version": "20260214_175253",
+  "trained_at": "2026-02-14T17:52:53.081469",
+  "model_type": "random_forest",
+  "training_samples": 72,
+  "test_samples": 18,
+  "vocabulary_size": 5000,
+  "accuracy": 0.7777777777777778,
+  "precision": 0.8571428571428571,
+  "recall": 0.6666666666666666,
+  "f1_score": 0.75
+}

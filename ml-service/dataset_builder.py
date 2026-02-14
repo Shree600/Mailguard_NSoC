@@ -22,13 +22,25 @@ import argparse
 import pandas as pd
 from datetime import datetime
 
+# Fix Windows console encoding for emojis
+if sys.platform == 'win32':
+    try:
+        # Set UTF-8 encoding for stdout
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # Python 3.6 and earlier
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
 # Check if pymongo is available
 try:
     from pymongo import MongoClient
     MONGODB_AVAILABLE = True
 except ImportError:
     MONGODB_AVAILABLE = False
-    print("⚠️  Warning: pymongo not installed. Install with: pip install pymongo")
+    print("WARNING: pymongo not installed. Install with: pip install pymongo")
 
 
 class DatasetBuilder:

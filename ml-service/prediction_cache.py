@@ -12,7 +12,18 @@ Key Features:
 - Performance metrics (hit rate tracking)
 """
 
+import sys
 import hashlib
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 import time
 from threading import Lock
 from typing import Optional, Dict, Any
