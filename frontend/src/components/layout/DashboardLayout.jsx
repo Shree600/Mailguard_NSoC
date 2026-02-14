@@ -16,7 +16,7 @@ export default function DashboardLayout({ children }) {
     <div className="min-h-screen bg-slate-900">
       {/* Top Header Bar */}
       <header className="h-16 border-b border-slate-700 bg-slate-800">
-        <div className="h-full flex items-center justify-between px-4 sm:px-6 max-w-[1920px] mx-auto">
+        <div className="h-full flex items-center justify-between px-4 sm:px-6 max-w-7xl mx-auto">
           {/* Left side - Branding */}
           <div className="flex items-center gap-2">
             <Logo className="w-8 h-8" showText={false} />
@@ -74,7 +74,7 @@ export default function DashboardLayout({ children }) {
       </header>
 
       {/* Main content */}
-      <main className="p-4 sm:p-6 max-w-[1920px] mx-auto">
+      <main className="p-4 sm:p-6 max-w-7xl mx-auto">
         {children}
       </main>
     </div>
