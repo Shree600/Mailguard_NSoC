@@ -44,7 +44,7 @@ services:
           cpus: '0.5'
           memory: 512M
     healthcheck:
-      test: ["CMD", "mongosh", "--username", "$${MONGO_ROOT_USERNAME:-admin}", "--password", "$${MONGO_ROOT_PASSWORD:-change_this_password}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok" , "--host", "localhost"]
       interval: 30s
       timeout: 10s
       retries: 5
