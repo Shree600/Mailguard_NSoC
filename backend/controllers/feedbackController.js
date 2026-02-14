@@ -162,8 +162,11 @@ exports.getUserFeedback = async (req, res) => {
   try {
     const userId = req.mongoUserId;
 
-    // Get all feedback with email details populated
-    const feedbacks = await Feedback.find({ userId })
+    // Get only feedback that hasn't been used in training yet
+    const feedbacks = await Feedback.find({ 
+      userId,
+      usedInTraining: { $ne: true } // Only show unused feedback
+    })
       .populate({
         path: 'emailId',
         select: 'subject sender receivedAt'
@@ -209,8 +212,11 @@ exports.getFeedbackStats = async (req, res) => {
   try {
     const userId = req.mongoUserId;
 
-    // Get user-specific stats
-    const userFeedbacks = await Feedback.find({ userId });
+    // Get only unused feedback for user-specific stats
+    const userFeedbacks = await Feedback.find({ 
+      userId,
+      usedInTraining: { $ne: true } // Only count unused feedback
+    });
     
     const userStats = {
       total: userFeedbacks.length,
