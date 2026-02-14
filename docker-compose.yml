@@ -33,7 +33,7 @@ services:
       - mongo-config:/data/configdb
     networks:
       - mailguard-network
-   security_opt:
+    security_opt:
       - no-new-privileges:true
     deploy:
       resources:
