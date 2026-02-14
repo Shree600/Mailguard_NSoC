@@ -33,7 +33,6 @@ export default defineConfig({
   build: {
     // Production build optimizations
     target: 'es2020',
-    minify: 'esbuild',
     // Chunk splitting for better caching
     rollupOptions: {
       output: {
