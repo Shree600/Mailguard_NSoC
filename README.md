@@ -13,6 +13,7 @@ Mailguard is a full-stack application that automatically detects phishing emails
 - 🤖 **AI-Powered Detection**: Random Forest ML model with TF-IDF vectorization for accurate phishing detection
 - 📧 **Gmail Integration**: OAuth2 integration for secure email fetching and scanning
 - 🎯 **Real-time Classification**: Instant phishing detection with confidence scores
+- 🔎 **Prediction Explainability**: Top token-level risk signals for each classification
 - 📊 **Analytics Dashboard**: Comprehensive stats, charts, and email management interface
 - 🔄 **Auto-Retraining**: Feedback loop with automatic model retraining capability
 - 🔐 **Secure Authentication**: Clerk-based auth with MFA and social login support
@@ -222,6 +223,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 4. Review Results
 - View classification results in dashboard
 - See confidence scores for each prediction
+- Review top model signals that influenced each prediction
 - Filter by classification type (All/Safe/Phishing)
 
 ### 5. Provide Feedback

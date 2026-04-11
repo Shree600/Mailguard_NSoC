@@ -41,6 +41,7 @@ async function predictEmail(text) {
       prediction: result.prediction,
       confidence: result.confidence,
       probabilities: result.probabilities,
+      explanation: result.explanation || { top_signals: [], method: 'unavailable' },
       modelVersion: result.model_version || 'unknown'  // Include version from ML service
     };
 
@@ -195,6 +196,7 @@ async function classifyEmails(emailObjects) {
       prediction: predictions[index].prediction,
       confidence: predictions[index].confidence,
       probabilities: predictions[index].probabilities,
+      explanation: predictions[index].explanation || { top_signals: [], method: 'unavailable' },
       modelVersion: predictions[index].model_version || 'unknown' // Use actual version from ML service
     }));
 

@@ -389,6 +389,60 @@ def get_model_status():
     return status
 
 
+def _build_explanation(text_vectorized, top_k=5):
+    """
+    Build lightweight explainability data from model feature importance
+    and TF-IDF activation values.
+
+    Returns:
+        dict: {
+            "top_signals": [{"token": str, "score": float}],
+            "method": str
+        }
+    """
+    try:
+        non_zero_indices = text_vectorized.indices
+        if len(non_zero_indices) == 0:
+            return {"top_signals": [], "method": "none"}
+
+        tokens = vectorizer.get_feature_names_out()
+        tfidf_values = text_vectorized.data
+
+        if hasattr(model, 'feature_importances_'):
+            feature_scores = model.feature_importances_
+            method = "tfidf_x_feature_importance"
+            combined_scores = []
+            for idx, tfidf_val in zip(non_zero_indices, tfidf_values):
+                importance = float(feature_scores[idx]) if idx < len(feature_scores) else 0.0
+                combined_scores.append((idx, float(tfidf_val) * importance))
+        else:
+            method = "tfidf_weight"
+            combined_scores = [(idx, float(tfidf_val)) for idx, tfidf_val in zip(non_zero_indices, tfidf_values)]
+
+        combined_scores.sort(key=lambda item: item[1], reverse=True)
+        top_features = combined_scores[:top_k]
+
+        top_signals = [
+            {
+                "token": str(tokens[idx]),
+                "score": round(float(score), 6)
+            }
+            for idx, score in top_features
+            if idx < len(tokens)
+        ]
+
+        return {
+            "top_signals": top_signals,
+            "method": method
+        }
+    except Exception:
+        # Explanation is best-effort and should not fail prediction flow.
+        return {
+            "top_signals": [],
+            "method": "unavailable"
+        }
+
+
 def predict_email(text):
     """
     Predict if an email is phishing or safe.
@@ -450,6 +504,8 @@ def predict_email(text):
         # NEW: Calculate prediction latency
         prediction_time = time.time() - start_time
         
+        explanation = _build_explanation(text_vectorized)
+
         # Format result with model version
         result = {
             "prediction": "phishing" if prediction == 1 else "safe",
@@ -458,6 +514,7 @@ def predict_email(text):
                 "safe": float(probabilities[0]),
                 "phishing": float(probabilities[1])
             },
+            "explanation": explanation,
             "model_version": model_version
         }
         
@@ -561,7 +618,10 @@ def predict_emails_batch(texts):
             probabilities_array = model.predict_proba(texts_vectorized)
             
             # Format and store new predictions
-            for idx, pred, probs in zip(indices_to_predict, predictions, probabilities_array):
+            for row_position, (idx, pred, probs) in enumerate(zip(indices_to_predict, predictions, probabilities_array)):
+                row_vector = texts_vectorized[row_position]
+                explanation = _build_explanation(row_vector)
+
                 result = {
                     "prediction": "phishing" if pred == 1 else "safe",
                     "confidence": float(max(probs)),
@@ -569,6 +629,7 @@ def predict_emails_batch(texts):
                         "safe": float(probs[0]),
                         "phishing": float(probs[1])
                     },
+                    "explanation": explanation,
                     "model_version": model_version
                 }
                 results[idx] = result

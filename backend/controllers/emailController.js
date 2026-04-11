@@ -88,6 +88,7 @@ exports.classifyEmails = async (req, res) => {
             prediction: prediction.prediction,
             confidence: prediction.confidence,
             probabilities: prediction.probabilities,
+            explanation: prediction.explanation,
             createdAt: new Date() // Update timestamp
           },
           {
@@ -322,6 +323,9 @@ exports.getClassifiedEmails = async (req, res) => {
         confidence: {
           $ifNull: ['$classification.confidence', 0]
         },
+        explanation: {
+          $ifNull: ['$classification.explanation', { top_signals: [], method: 'unavailable' }]
+        },
         classified: {
           $cond: [{ $ne: ['$classification', null] }, true, false]
         }
@@ -359,6 +363,7 @@ exports.getClassifiedEmails = async (req, res) => {
         gmailId: 1,
         prediction: 1,
         confidence: 1,
+        explanation: 1,
         classified: 1
       }
     });

@@ -95,6 +95,7 @@ class PredictionResponse(BaseModel):
     prediction: str
     confidence: float
     probabilities: dict
+    explanation: Dict[str, Any]
     model_version: str  # NEW: Include model version for tracking
 
 

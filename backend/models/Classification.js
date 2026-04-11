@@ -42,6 +42,21 @@ const classificationSchema = new mongoose.Schema({
       max: [1, 'Probability cannot exceed 1']
     }
   },
+
+  // Lightweight explainability signals from ML service
+  explanation: {
+    top_signals: [
+      {
+        token: { type: String, trim: true },
+        score: { type: Number, min: 0 }
+      }
+    ],
+    method: {
+      type: String,
+      default: 'unavailable',
+      trim: true
+    }
+  },
   
   // Timestamp
   createdAt: {

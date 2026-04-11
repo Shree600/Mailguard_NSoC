@@ -4,7 +4,6 @@
  * Supports multi-select for bulk operations
  */
 
-import { useState } from 'react'
 import { 
   Table, 
   TableBody, 
@@ -20,8 +19,7 @@ import {
   Trash2, 
   ThumbsUp, 
   AlertTriangle, 
-  Inbox,
-  ArrowUpDown
+  Inbox
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -203,6 +201,12 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
     return text.length > length ? text.substring(0, length) + '...' : text
   }
 
+  const topSignals = email.explanation?.top_signals || []
+  const signalPreview = topSignals
+    .slice(0, 3)
+    .map((signal) => signal.token)
+    .filter(Boolean)
+
   return (
     <TableRow className={`transition-colors border-b border-slate-700 hover:bg-slate-700/50 ${isSelected ? 'bg-blue-500/10' : ''}`}>
       {/* Checkbox Column */}
@@ -242,6 +246,11 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
         <div className="text-sm text-slate-100 font-medium">
           {getConfidence()}
         </div>
+        {signalPreview.length > 0 && (
+          <div className="mt-1 text-xs text-slate-400 leading-tight">
+            Signals: {signalPreview.join(', ')}
+          </div>
+        )}
       </TableCell>
       
       {/* Actions Column */}
