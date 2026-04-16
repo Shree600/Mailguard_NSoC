@@ -16,6 +16,7 @@ import { lazy, Suspense } from 'react'
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Analytics = lazy(() => import('./pages/Analytics'))
 const DashboardLayout = lazy(() => import('./components/layout/DashboardLayout'))
 
 // Loading fallback component
@@ -54,6 +55,23 @@ function App() {
                 <SignedIn>
                   <DashboardLayout>
                     <Dashboard />
+                  </DashboardLayout>
+                </SignedIn>
+                <SignedOut>
+                  <Navigate to="/login" replace />
+                </SignedOut>
+              </>
+            }
+          />
+          
+          {/* Protected analytics route with layout - wrapped in Suspense */}
+          <Route
+            path="/analytics"
+            element={
+              <>
+                <SignedIn>
+                  <DashboardLayout>
+                    <Analytics />
                   </DashboardLayout>
                 </SignedIn>
                 <SignedOut>

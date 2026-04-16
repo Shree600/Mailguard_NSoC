@@ -115,6 +115,7 @@ const emailRoutes = require('./routes/emailRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const migrationRoutes = require('./routes/migrationRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 // Test route - verifies server is running
 app.get('/', (req, res) => {
@@ -141,6 +142,9 @@ app.use('/api/admin', timeout('30s'), adminRoutes);
 
 // Mount migration routes
 app.use('/api/migration', timeout('90s'), migrationRoutes); // 90s for migration operations
+
+// Mount analytics routes
+app.use('/api/analytics', timeout('45s'), analyticsRoutes); // 45s for analytics operations
 
 // ================================================
 // ERROR HANDLING

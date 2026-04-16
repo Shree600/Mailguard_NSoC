@@ -11,6 +11,13 @@ const classificationSchema = new mongoose.Schema({
     required: true
   },
   
+  // User who owns this classification
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  
   // Prediction result: "phishing" or "safe"
   prediction: {
     type: String,
@@ -67,6 +74,7 @@ const classificationSchema = new mongoose.Schema({
 
 // Indexes for faster queries
 classificationSchema.index({ emailId: 1 }, { unique: true }); // Prevent duplicates
+classificationSchema.index({ userId: 1 }); // For user-specific queries
 classificationSchema.index({ prediction: 1 });
 classificationSchema.index({ createdAt: -1 });
 
