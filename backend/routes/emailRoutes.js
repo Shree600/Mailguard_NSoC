@@ -9,17 +9,19 @@ const syncUserMiddleware = require('../middleware/syncUserMiddleware');
 const { validate, schemas } = require('../middleware/validation');
 const { cacheMiddleware, invalidateCacheMiddleware, cachePresets } = require('../middleware/cacheMiddleware');
 const { classifyLimiter, bulkOperationLimiter } = require('../middleware/rateLimiter');
+const { invalidateAnalyticsCache } = require('../middleware/analyticsCache');
 
 // All email routes require authentication and user sync
 router.use(authMiddleware);
 router.use(syncUserMiddleware);
 
 // Classify all unclassified emails
-// INVALIDATES: User cache after classification completes
+// INVALIDATES: User cache and analytics cache after classification completes
 router.post('/classify', 
   classifyLimiter, 
   validate(schemas.classifyEmails), 
-  invalidateCacheMiddleware(), // Clear user cache after classification
+  invalidateCacheMiddleware(cachePresets.user),
+  invalidateAnalyticsCache,
   emailController.classifyEmails
 );
 

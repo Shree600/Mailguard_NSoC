@@ -35,10 +35,10 @@ const userSchema = new mongoose.Schema(
       trim: true, // Removes whitespace from both ends
     },
 
-    // User role for authorization (admin, user)
+    // User role for authorization (admin, user, analyst)
     role: {
       type: String,
-      enum: ['user', 'admin'],
+      enum: ['user', 'admin', 'analyst'],
       default: 'user',
     },
 
