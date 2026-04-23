@@ -1,7 +1,7 @@
 /**
  * CLERK USER SYNC MIDDLEWARE
- * Ensures Clerk user exists in MongoDB database
- * Creates user if not exists, then proceeds to next middleware
+ * Ensures Clerk user exists in MongoDB database.
+ * Only links accounts via VERIFIED email addresses.
  */
 
 const User = require('../models/User');
@@ -9,67 +9,64 @@ const { clerkClient } = require('@clerk/clerk-sdk-node');
 
 const syncUserMiddleware = async (req, res, next) => {
   try {
-    const clerkUserId = req.userId; // Set by authMiddleware
+    const clerkUserId = req.userId; // Set by Clerk authMiddleware
 
     if (!clerkUserId) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not authenticated'
-      });
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
     }
 
-    // Check if user exists in MongoDB by Clerk ID
+    // Fast path: user already synced
     let user = await User.findOne({ clerkId: clerkUserId });
 
     if (!user) {
-      // User doesn't exist by Clerk ID, fetch from Clerk
-      console.log(`📝 Syncing user in database for Clerk ID: ${clerkUserId}`);
-      
+      console.log(`📝 Syncing new user for Clerk ID: ${clerkUserId}`);
+
+      let clerkUser;
       try {
-        // Fetch user details from Clerk
-        const clerkUser = await clerkClient.users.getUser(clerkUserId);
-        const userEmail = clerkUser.emailAddresses[0]?.emailAddress || '';
-        const userName = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'User';
-        
-        // Check if user exists by email (from old JWT system)
-        user = await User.findOne({ email: userEmail });
-        
-        if (user) {
-          // User exists by email, update with Clerk ID
-          console.log(`🔄 Updating existing user with Clerk ID: ${userEmail}`);
-          user.clerkId = clerkUserId;
-          user.name = userName;
-          await user.save();
-          console.log(`✅ User updated with Clerk ID: ${user.email}`);
-        } else {
-          // Create new user
-          user = await User.create({
-            clerkId: clerkUserId,
-            email: userEmail,
-            name: userName,
-          });
-          console.log(`✅ User created in database: ${user.email}`);
-        }
+        clerkUser = await clerkClient.users.getUser(clerkUserId);
       } catch (clerkError) {
-        console.error('❌ Failed to sync user from Clerk:', clerkError);
-        return res.status(500).json({
+        console.error('❌ Failed to fetch user from Clerk:', clerkError);
+        return res.status(500).json({ success: false, message: 'Failed to sync user with Clerk' });
+      }
+
+      // Only trust verified email addresses — never link on unverified email
+      const verifiedEmail = clerkUser.emailAddresses.find(
+        (e) => e.id === clerkUser.primaryEmailAddressId && e.verification?.status === 'verified'
+      );
+
+      if (!verifiedEmail) {
+        console.warn(`⚠️ Clerk user ${clerkUserId} has no verified primary email`);
+        return res.status(403).json({
           success: false,
-          message: 'Failed to sync user with Clerk'
+          message: 'Account email is not verified. Please verify your email before continuing.',
         });
+      }
+
+      const userEmail = verifiedEmail.emailAddress.toLowerCase();
+      const userName =
+        `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'User';
+
+      // Check for existing account by verified email only
+      user = await User.findOne({ email: userEmail });
+
+      if (user) {
+        // Link existing account to Clerk ID
+        console.log(`🔄 Linking existing account to Clerk ID: ${userEmail}`);
+        user.clerkId = clerkUserId;
+        user.name = userName;
+        await user.save();
+        console.log(`✅ Account linked: ${user.email}`);
+      } else {
+        user = await User.create({ clerkId: clerkUserId, email: userEmail, name: userName });
+        console.log(`✅ New user created: ${user.email}`);
       }
     }
 
-    // Attach MongoDB user ID to request
     req.mongoUserId = user._id;
-    
     next();
   } catch (error) {
     console.error('❌ User sync error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to sync user data',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to sync user data', error: error.message });
   }
 };
 

@@ -1,294 +1,300 @@
-// Import required modules
+const crypto = require('crypto');
 const User = require('../models/User');
 const Email = require('../models/Email');
+const OAuthState = require('../models/OAuthState');
 const { getAuthUrl, getTokensFromCode } = require('../config/googleOAuth');
 const { fetchEmails } = require('../services/gmailService');
 
+// ─── HMAC secret validation ───────────────────────────────────────────────────
+const HMAC_SECRET = process.env.ENCRYPTION_KEY || process.env.SESSION_SECRET;
+
+if (!HMAC_SECRET || HMAC_SECRET.length < 32) {
+  throw new Error('FATAL: HMAC secret (ENCRYPTION_KEY or SESSION_SECRET) must be set and >= 32 characters');
+}
+
+const STATE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+
+// ─── State helpers ────────────────────────────────────────────────────────────
+
+function buildSignedState(userId, nonce) {
+  const payload = {
+    userId: userId.toString(),
+    nonce,
+    ts: Date.now(),
+  };
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', HMAC_SECRET).update(data).digest('hex');
+  return `${data}.${sig}`;
+}
+
+function parseAndVerifyState(raw) {
+  const parts = raw.split('.');
+  if (parts.length !== 2) throw new Error('Malformed state');
+
+  const [data, sig] = parts;
+
+  const expected = crypto.createHmac('sha256', HMAC_SECRET).update(data).digest('hex');
+  const sigBuf = Buffer.from(sig, 'hex');
+  const expBuf = Buffer.from(expected, 'hex');
+
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    throw new Error('State signature invalid');
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(data, 'base64url').toString());
+  } catch {
+    throw new Error('State payload unreadable');
+  }
+
+  if (!payload.userId || !payload.nonce || !payload.ts) {
+    throw new Error('State payload incomplete');
+  }
+
+  if (Date.now() - payload.ts > STATE_MAX_AGE_MS) {
+    throw new Error('State expired');
+  }
+
+  return payload;
+}
+
+// ─── Controllers ─────────────────────────────────────────────────────────────
+
 /**
  * INITIATE GMAIL OAUTH FLOW
- * @route   GET /api/gmail/auth
- * @access  Protected (requires JWT token)
- * @desc    Redirect user to Google OAuth consent screen
+ * @route  POST /api/gmail/auth/initiate
+ * @access Protected
  */
 const initiateGmailAuth = async (req, res) => {
   try {
-    // MongoDB user ID is attached by syncUserMiddleware
     const userId = req.mongoUserId;
 
-    // Generate Google OAuth authorization URL
+    // Verify the user actually exists in DB before issuing state
+    const userExists = await User.exists({ _id: userId });
+    if (!userExists) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const nonce = crypto.randomBytes(32).toString('hex');
+
+    // Persist nonce server-side for replay protection
+    await OAuthState.create({ nonce, userId });
+
+    const stateParam = buildSignedState(userId, nonce);
     const authUrl = getAuthUrl();
+    const authUrlWithState = `${authUrl}&state=${encodeURIComponent(stateParam)}`;
 
-    // Store userId in session/state for callback verification
-    // In production, use a more secure method (like signed state parameter)
-    // For now, we'll include userId in the redirect
-    const stateParam = Buffer.from(JSON.stringify({ userId })).toString('base64');
-    const authUrlWithState = `${authUrl}&state=${stateParam}`;
-
-    // Return the authorization URL
     res.status(200).json({
       success: true,
       message: 'Authorization URL generated successfully',
       data: {
         authUrl: authUrlWithState,
-        instructions: 'Visit this URL in your browser to authorize Gmail access'
-      }
+        instructions: 'Visit this URL in your browser to authorize Gmail access',
+      },
     });
-
   } catch (error) {
     console.error('Gmail auth initiation error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to initiate Gmail authorization',
-      error: error.message
+      error: error.message,
     });
   }
 };
 
 /**
  * HANDLE GMAIL OAUTH CALLBACK
- * @route   GET /api/gmail/callback
- * @access  Public (but validates state parameter)
- * @desc    Exchange authorization code for tokens and save to user
+ * @route  GET /api/gmail/callback
+ * @access Public (validated via signed state)
  */
 const handleGmailCallback = async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
   try {
-    // Get authorization code and state from query parameters
-    const { code, state, error } = req.query;
+    const { code, state, error: oauthError } = req.query;
 
-    // Check if user denied access
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'User denied Gmail access',
-        error: error
-      });
+    if (oauthError) {
+      return res.redirect(
+        `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('Gmail access denied')}`
+      );
     }
 
-    // Validate that code exists
-    if (!code) {
-      return res.status(400).json({
-        success: false,
-        message: 'Authorization code is missing'
-      });
+    if (!code || !state) {
+      return res.redirect(
+        `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('Missing authorization code or state')}`
+      );
     }
 
-    // Decode state parameter to get userId
-    let userId;
+    // 1. Verify HMAC signature, expiry, and payload structure
+    let payload;
     try {
-      const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
-      userId = stateData.userId;
+      payload = parseAndVerifyState(decodeURIComponent(state));
     } catch (err) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid state parameter'
-      });
+      console.warn('OAuth state verification failed:', err.message);
+      return res.redirect(
+        `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('Invalid or expired authorization request')}`
+      );
     }
 
-    // Exchange authorization code for tokens
+    const { userId, nonce } = payload;
+
+    // 2. Replay protection: check nonce exists and has not been used
+    const storedState = await OAuthState.findOne({ nonce, userId });
+
+    if (!storedState) {
+      console.warn(`OAuth nonce not found for userId=${userId}`);
+      return res.redirect(
+        `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('Authorization request not found or expired')}`
+      );
+    }
+
+    if (storedState.used) {
+      console.warn(`OAuth replay attempt detected for userId=${userId}`);
+      return res.redirect(
+        `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('Authorization request already used')}`
+      );
+    }
+
+    // 3. Mark nonce as used immediately (one-time use)
+    await OAuthState.findByIdAndUpdate(storedState._id, { used: true });
+
+    // 4. Session binding: confirm userId from state matches a real DB user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.redirect(
+        `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('User not found')}`
+      );
+    }
+
+    // 5. Exchange code for tokens
     const tokens = await getTokensFromCode(code);
 
-    // Validate tokens - CRITICAL: Both access_token AND refresh_token are required
     if (!tokens.access_token) {
       throw new Error('Failed to receive access token from Google');
     }
 
-    // CRITICAL: Refresh token is REQUIRED for long-term Gmail access
-    // Without it, user will lose Gmail connection after ~1 hour when access token expires
     if (!tokens.refresh_token) {
-      console.error('❌ CRITICAL: No refresh token received from Google');
-      console.error('This usually happens when:');
-      console.error('  1. User previously authorized and refresh token already exists');
-      console.error('  2. OAuth prompt is not set to "consent"');
-      console.error('  3. User is testing with same account repeatedly');
-      
-      // Redirect with specific error
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      return res.redirect(`${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent('No refresh token received. Please revoke app access in Google Account settings and try again.')}`);
+      console.error('No refresh token received from Google');
+      return res.redirect(
+        `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent(
+          'No refresh token received. Please revoke app access in Google Account settings and try again.'
+        )}`
+      );
     }
 
-    // Update user with Gmail tokens
-    const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        gmailAccessToken: tokens.access_token,
-        gmailRefreshToken: tokens.refresh_token, // Now guaranteed to exist
-        gmailConnectedAt: new Date()
-      },
-      { new: true, select: '-passwordHash' } // Return updated user without password
-    );
+    // 6. Persist tokens — use findByIdAndUpdate to avoid triggering unrelated pre-save hooks
+    await User.findByIdAndUpdate(userId, {
+      gmailAccessToken: tokens.access_token,
+      gmailRefreshToken: tokens.refresh_token,
+      gmailConnectedAt: new Date(),
+    });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // Redirect to dashboard with success message
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendUrl}/dashboard?gmail=connected`);
-
   } catch (error) {
     console.error('Gmail callback error:', error);
-    
-    // Redirect to dashboard with error message
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent(error.message)}`);
+    res.redirect(
+      `${frontendUrl}/dashboard?gmail=error&message=${encodeURIComponent(error.message)}`
+    );
   }
 };
 
 /**
  * CHECK GMAIL CONNECTION STATUS
- * @route   GET /api/gmail/status
- * @access  Protected (requires JWT token)
- * @desc    Check if user has connected Gmail
+ * @route  GET /api/gmail/status
+ * @access Protected
  */
 const checkGmailStatus = async (req, res) => {
   try {
-    const userId = req.mongoUserId;
-
-    // Get user from database
-    const user = await User.findById(userId).select('gmailAccessToken gmailConnectedAt');
+    const user = await User.findById(req.mongoUserId).select('gmailAccessToken gmailConnectedAt');
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-
-    // Check if Gmail is connected
-    const isConnected = !!user.gmailAccessToken;
 
     res.status(200).json({
       success: true,
       data: {
-        gmailConnected: isConnected,
-        connectedAt: user.gmailConnectedAt || null
-      }
+        gmailConnected: !!user.gmailAccessToken,
+        connectedAt: user.gmailConnectedAt || null,
+      },
     });
-
   } catch (error) {
     console.error('Gmail status check error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to check Gmail status',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to check Gmail status', error: error.message });
   }
 };
 
 /**
  * DISCONNECT GMAIL
- * @route   DELETE /api/gmail/disconnect
- * @access  Protected (requires JWT token)
- * @desc    Remove Gmail tokens from user account
+ * @route  DELETE /api/gmail/disconnect
+ * @access Protected
  */
 const disconnectGmail = async (req, res) => {
   try {
-    const userId = req.mongoUserId;
-
-    // Remove Gmail tokens from user
     const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        gmailAccessToken: null,
-        gmailRefreshToken: null,
-        gmailConnectedAt: null
-      },
+      req.mongoUserId,
+      { gmailAccessToken: null, gmailRefreshToken: null, gmailConnectedAt: null },
       { new: true, select: 'name email' }
     );
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     res.status(200).json({
       success: true,
       message: 'Gmail disconnected successfully',
-      data: {
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        gmailConnected: false
-      }
+      data: { userId: user._id, name: user.name, email: user.email, gmailConnected: false },
     });
-
   } catch (error) {
     console.error('Gmail disconnect error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to disconnect Gmail',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to disconnect Gmail', error: error.message });
   }
 };
 
 /**
  * FETCH AND SAVE EMAILS FROM GMAIL
- * @route   POST /api/gmail/fetch
- * @access  Protected (requires JWT token)
- * @desc    Fetch emails from Gmail and save to database
- * @body    { maxResults, dateFrom, dateTo, query }
+ * @route  POST /api/gmail/fetch
+ * @access Protected
+ * @body   { maxResults, dateFrom, dateTo, query, fetchAll, timeRange }
  */
 const fetchAndSaveEmails = async (req, res) => {
   try {
     const userId = req.mongoUserId;
-
-    // Get parameters from request body
-    const { 
+    const {
       maxResults = 50,
       dateFrom,
       dateTo,
-      query = '', // Gmail search query (e.g., "from:someone@example.com" or "has:attachment")
-      fetchAll = false, // Fetch all emails without limit
-      timeRange = '1h' // NEW: Time range for recent emails (5m, 15m, 1h, 6h, 1d, 7d, 30d, all)
+      query = '',
+      fetchAll = false,
+      timeRange = '1h',
     } = req.body;
 
-    // Validate maxResults (ignored if fetchAll is true)
-    const validatedMax = fetchAll ? 500 : Math.min(Math.max(parseInt(maxResults), 1), 100); // Between 1 and 100, or 500 for fetchAll
-    
-    // Get user from database
-    const user = await User.findById(userId);
+    const validatedMax = fetchAll ? 500 : Math.min(Math.max(parseInt(maxResults), 1), 100);
 
+    const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Check if Gmail is connected
     if (!user.gmailAccessToken) {
       return res.status(400).json({
         success: false,
         message: 'Gmail not connected. Please connect Gmail first.',
-        action: 'Call GET /api/gmail/auth to connect Gmail'
+        action: 'Call POST /api/gmail/auth/initiate to connect Gmail',
       });
     }
 
-    // Build Gmail search query - FETCH REAL-TIME EMAILS
-    let gmailSearchQuery = 'in:inbox';
-    
-    // Map timeRange to Gmail syntax
     const timeRangeMap = {
-      '5m': '5m',
-      '15m': '15m', 
-      '30m': '30m',
-      '1h': '1h',
-      '6h': '6h',
-      '12h': '12h',
-      '1d': '1d',
-      '3d': '3d',
-      '7d': '7d',
-      '30d': '30d',
-      'all': null // Don't add time filter
+      '5m': '5m', '15m': '15m', '30m': '30m',
+      '1h': '1h', '6h': '6h', '12h': '12h',
+      '1d': '1d', '3d': '3d', '7d': '7d', '30d': '30d',
+      'all': null,
     };
-    
-    // Apply time range filter if no custom date filters
+
+    let gmailSearchQuery = 'in:inbox';
+
     if (!dateFrom && !dateTo && !query) {
       const gmailTimeRange = timeRangeMap[timeRange] || '1h';
       if (gmailTimeRange) {
@@ -296,41 +302,35 @@ const fetchAndSaveEmails = async (req, res) => {
         console.log(`📅 Filtering emails: Last ${timeRange} (newer_than:${gmailTimeRange})`);
         console.log(`⏰ Current time: ${new Date().toLocaleString()}`);
       } else {
-        console.log(`📅 Fetching all inbox emails (no time filter)`);
+        console.log('📅 Fetching all inbox emails (no time filter)');
       }
     }
-    
-    // Add date filters if provided (overrides time range)
+
     if (dateFrom) {
-      const fromDate = new Date(dateFrom);
-      gmailSearchQuery += ` after:${fromDate.getFullYear()}/${(fromDate.getMonth() + 1)}/${fromDate.getDate()}`;
+      const d = new Date(dateFrom);
+      gmailSearchQuery += ` after:${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
     }
     if (dateTo) {
-      const toDate = new Date(dateTo);
-      gmailSearchQuery += ` before:${toDate.getFullYear()}/${(toDate.getMonth() + 1)}/${toDate.getDate()}`;
+      const d = new Date(dateTo);
+      gmailSearchQuery += ` before:${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
     }
-    
-    // Add user's custom query if provided
     if (query) {
       gmailSearchQuery += ` ${query}`;
     }
-    
-    // Fetch emails from Gmail using service
+
     let fetchedEmails;
     try {
       fetchedEmails = await fetchEmails(user, validatedMax, gmailSearchQuery);
     } catch (fetchError) {
-      // Handle authentication errors specifically
       if (fetchError.requiresReauth || fetchError.authError === 'invalid_grant') {
         return res.status(401).json({
           success: false,
           message: fetchError.message,
           requiresReauth: true,
           authError: fetchError.authError || 'token_expired',
-          action: 'Please reconnect your Gmail account by going to Settings > Connected Accounts'
+          action: 'Please reconnect your Gmail account by going to Settings > Connected Accounts',
         });
       }
-      // Re-throw other errors to be caught by outer catch block
       throw fetchError;
     }
 
@@ -338,25 +338,17 @@ const fetchAndSaveEmails = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: 'No emails found in Gmail inbox',
-        data: {
-          fetched: 0,
-          saved: 0,
-          duplicates: 0,
-          errors: 0
-        }
+        data: { fetched: 0, saved: 0, duplicates: 0, errors: 0 },
       });
     }
 
-    // Statistics tracking
     let savedCount = 0;
     let duplicateCount = 0;
     let errorCount = 0;
 
-    // Process and save each email
     for (const fetchedEmail of fetchedEmails) {
       try {
-        // Prepare email document
-        const emailDoc = {
+        const email = new Email({
           userId: user._id,
           gmailId: fetchedEmail.gmailId,
           sender: fetchedEmail.sender,
@@ -365,30 +357,22 @@ const fetchAndSaveEmails = async (req, res) => {
           htmlBody: fetchedEmail.htmlBody,
           receivedAt: fetchedEmail.receivedAt,
           fetchedAt: new Date(),
-          metadata: fetchedEmail.metadata
-        };
-
-        // Try to save email (will fail if duplicate gmailId exists)
-        const email = new Email(emailDoc);
+          metadata: fetchedEmail.metadata,
+        });
         await email.save();
         savedCount++;
-
       } catch (error) {
-        // Check if it's a duplicate key error
         if (error.code === 11000) {
           duplicateCount++;
         } else {
           errorCount++;
-          console.error(`   ❌ Error saving: ${error.message}`);
+          console.error(`❌ Error saving email: ${error.message}`);
         }
       }
     }
 
-    // Return success response with refetch suggestion
     const totalInDb = await Email.countDocuments({ userId: user._id });
-    const shouldRefetch = savedCount > 0 && savedCount === fetchedEmails.length; // All were new
-    
-    // Check if response has already been sent (e.g., by timeout middleware)
+
     if (!res.headersSent) {
       res.status(200).json({
         success: true,
@@ -399,59 +383,47 @@ const fetchAndSaveEmails = async (req, res) => {
           duplicates: duplicateCount,
           errors: errorCount,
           totalInDatabase: totalInDb,
-          shouldRefetch: shouldRefetch // Suggest fetching more if we got all new
-        }
+          shouldRefetch: savedCount > 0 && savedCount === fetchedEmails.length,
+        },
       });
     }
-
   } catch (error) {
     console.error('Fetch and save error:', error);
-    
-    // Check if response has already been sent (e.g., by timeout middleware)
-    if (res.headersSent) {
-      return; // Exit early if response already sent
-    }
-    
-    // Handle specific error types with appropriate status codes
-    if (error.code === 401 || error.message.includes('Token may be expired') || error.message.includes('authentication failed')) {
+
+    if (res.headersSent) return;
+
+    if (error.code === 401 || error.message?.includes('Token may be expired') || error.message?.includes('authentication failed')) {
       return res.status(401).json({
         success: false,
         message: 'Gmail token expired. Please reconnect Gmail.',
-        action: 'Call DELETE /api/gmail/disconnect then GET /api/gmail/auth'
+        action: 'Call DELETE /api/gmail/disconnect then POST /api/gmail/auth/initiate',
       });
     }
-    
+
     if (error.code === 429) {
       return res.status(429).json({
         success: false,
         message: 'Gmail API rate limit exceeded. Please try again later.',
-        retryAfter: '60 seconds'
+        retryAfter: '60 seconds',
       });
     }
-    
+
     if (error.code === 503 || error.code === 'ENOTFOUND') {
       return res.status(503).json({
         success: false,
         message: 'Cannot connect to Gmail servers',
-        error: 'Check your internet connection and try again'
+        error: 'Check your internet connection and try again',
       });
     }
 
-    // Generic error
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch and save emails',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch and save emails', error: error.message });
   }
 };
 
-// Export controller functions
 module.exports = {
   initiateGmailAuth,
   handleGmailCallback,
   checkGmailStatus,
   disconnectGmail,
-  fetchAndSaveEmails
-
+  fetchAndSaveEmails,
 };
