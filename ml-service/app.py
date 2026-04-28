@@ -30,6 +30,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Payload limits (bytes)
+MAX_ITEM_BYTES = 32_768
+MAX_TOTAL_BYTES = 262_144
+MAX_BATCH_COUNT = 1000
+
 # Configure CORS to allow requests from Node.js backend
 app.add_middleware(
     CORSMiddleware,
@@ -119,6 +124,25 @@ class BatchPredictionResponse(BaseModel):
     count: int
 
 
+def _byte_length(text: str) -> int:
+    try:
+        return len(text.encode("utf-8", "strict"))
+    except UnicodeError:
+        raise HTTPException(status_code=400, detail="Text contains invalid encoding")
+
+
+def _validate_text_item(text: str) -> None:
+    if not text or text.strip() == "":
+        raise HTTPException(status_code=400, detail="Email text cannot be empty")
+    if _byte_length(text) > MAX_ITEM_BYTES:
+        raise HTTPException(status_code=413, detail="Text exceeds per-item size limit")
+
+
+def _validate_total_bytes(total_bytes: int) -> None:
+    if total_bytes > MAX_TOTAL_BYTES:
+        raise HTTPException(status_code=413, detail="Payload exceeds total size limit")
+
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
@@ -162,7 +186,7 @@ async def root():
 
 # Prediction endpoint
 @app.post("/predict", response_model=PredictionResponse)
-async def predict(request: PredictionRequest):
+async def predict(request: PredictionRequest, raw_request: Request):
     """
     Predict if email text is phishing or safe.
     
@@ -174,8 +198,8 @@ async def predict(request: PredictionRequest):
     """
     try:
         # Validate input
-        if not request.text or request.text.strip() == "":
-            raise HTTPException(status_code=400, detail="Email text cannot be empty")
+        _validate_total_bytes(len(await raw_request.body()))
+        _validate_text_item(request.text)
         
         # Make prediction (async - non-blocking)
         result = await predictor.predict_email_async(request.text)
@@ -197,7 +221,7 @@ async def predict(request: PredictionRequest):
 
 # Batch prediction endpoint
 @app.post("/predict/batch", response_model=BatchPredictionResponse)
-async def predict_batch(request: BatchPredictionRequest):
+async def predict_batch(request: BatchPredictionRequest, raw_request: Request):
     """
     Predict multiple emails at once for better performance.
     
@@ -211,9 +235,17 @@ async def predict_batch(request: BatchPredictionRequest):
         # Validate input
         if not request.texts:
             raise HTTPException(status_code=400, detail="Texts list cannot be empty")
-        
-        if len(request.texts) > 1000:
+        if len(request.texts) > MAX_BATCH_COUNT:
             raise HTTPException(status_code=400, detail="Maximum 1000 texts per batch")
+
+        _validate_total_bytes(len(await raw_request.body()))
+
+        total_text_bytes = 0
+        for text in request.texts:
+            _validate_text_item(text)
+            total_text_bytes += _byte_length(text)
+
+        _validate_total_bytes(total_text_bytes)
         
         # Make batch prediction (async - non-blocking)
         results = await predictor.predict_emails_batch_async(request.texts)
