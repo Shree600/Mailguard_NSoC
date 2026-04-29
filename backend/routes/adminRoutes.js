@@ -66,4 +66,25 @@ router.get('/cache/stats', getCacheStats);
  */
 router.post('/cache/flush', adminOperationLimiter, flushCache);
 
+// ============================================
+// NEW ROUTES FOR ISSUE #13
+// ============================================
+
+/**
+ * GET /api/admin/ml/status
+ * Get ML operation status (lock state, progress, current operation)
+ * Returns status of any running retrain/reload operation
+ */
+router.get('/ml/status', adminController.getMLOperationStatus);
+
+/**
+ * POST /api/admin/ml/reload
+ * Reload ML models without retraining
+ * Useful for applying newly trained models without full retrain pipeline
+ */
+router.post('/ml/reload', 
+  adminOperationLimiter, 
+  adminController.reloadMLModels
+);
+
 module.exports = router;
