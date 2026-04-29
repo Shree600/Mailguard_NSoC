@@ -3,7 +3,19 @@
  * Centralized service for all backend API calls
  * Uses Axios for HTTP requests with Clerk authentication
  */
+import { z } from "zod";
 
+const EmailSchema = z.object({
+  id: z.string().or(z.number()),
+  subject: z.string(),
+  sender: z.string(),
+});
+
+function validate(schema, data) {
+  const r = schema.safeParse(data);
+  if (!r.success) { console.error("❌ Validation failed", r.error); return null; }
+  return r.data;
+}
 import axios from 'axios'
 
 // Backend API base URL
