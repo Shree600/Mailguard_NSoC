@@ -14,6 +14,17 @@ const logger = {
   error: (...args) => logger.error(...args), // always show errors
 };
 
+const EmailSchema = z.object({
+  id: z.string().or(z.number()),
+  subject: z.string(),
+  sender: z.string(),
+});
+
+function validate(schema, data) {
+  const r = schema.safeParse(data);
+  if (!r.success) { console.error("❌ Validation failed", r.error); return null; }
+  return r.data;
+}
 import axios from 'axios'
 
 // Backend API base URL
@@ -132,7 +143,7 @@ api.interceptors.response.use(
 export const getEmails = async (params = {}) => {
   try {
     const response = await api.get('/emails', { params })
-    return response.data
+  return validate(EmailListSchema, response.data, "GET /emails")
   } catch (error) {
     logger.error('❌ Failed to fetch emails:', error)
     throw error
@@ -146,7 +157,7 @@ export const getEmails = async (params = {}) => {
 export const getEmailStats = async () => {
   try {
     const response = await api.get('/emails/stats')
-    return response.data
+ return validate(StatsSchema, response.data, "GET /emails/stats")
   } catch (error) {
     logger.error('❌ Failed to fetch email stats:', error)
     throw error
