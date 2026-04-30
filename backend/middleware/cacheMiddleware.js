@@ -51,9 +51,12 @@ function cacheMiddleware(options = {}) {
     } else {
       // Default: use userId + route path + query params
       const userId = req.mongoUserId || req.userId || 'anonymous';
-      const queryString = Object.keys(req.query).length > 0 
-        ? JSON.stringify(req.query) 
-        : '';
+   const queryString = Object.keys(req.query).length > 0 
+  ? JSON.stringify(Object.keys(req.query).sort().reduce((acc, key) => {
+      acc[key] = req.query[key];
+      return acc;
+    }, {}))
+  : '';
       cacheKey = `route:${userId}:${req.path}${queryString}`;
     }
 
