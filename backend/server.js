@@ -1,5 +1,6 @@
-// Import required packages
 const express = require('express');
+const csrf = require('csurf');
+const csrfProtection = csrf({ cookie: true });
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
