@@ -69,7 +69,7 @@ const validateEnv = () => {
   }
 
   if (warnings.length > 0) {
-    console.warn('\n⚠️  Environment variable warnings:');
+    console.warn('\n⚠️ Environment variable warnings:');
     warnings.forEach(w => console.warn(`   - ${w}`));
     console.warn('');
   }
@@ -78,4 +78,65 @@ const validateEnv = () => {
   console.log('✅ Environment variables validated');
 };
 
+// ============================================
+// ML SERVICE CONNECTIVITY CHECK
+// ============================================
+
+/**
+ * Validates that the ML service is reachable at startup
+ * Non-blocking - won't crash the backend if ML service is down
+ */
+async function validateMLServiceReachability() {
+    const mlServiceUrl = process.env.ML_SERVICE_URL;
+    if (!mlServiceUrl) {
+        console.warn('⚠️ ML_SERVICE_URL not set - skipping connectivity check');
+        return false;
+    }
+    
+    console.log(`🔍 Checking ML service connectivity: ${mlServiceUrl}/health`);
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const response = await fetch(`${mlServiceUrl}/health`, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`✅ ML service reachable at ${mlServiceUrl}`);
+            if (data.model_loaded) {
+                console.log(`   Model loaded: ${data.model_loaded}`);
+                console.log(`   Model version: ${data.model_version || 'unknown'}`);
+            }
+            return true;
+        } else {
+            console.warn(`⚠️ ML service responded with status ${response.status} at ${mlServiceUrl}`);
+            return false;
+        }
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.warn(`⚠️ ML service timeout after 5 seconds at ${mlServiceUrl}`);
+        } else {
+            console.warn(`⚠️ ML service unreachable at ${mlServiceUrl}: ${error.message}`);
+            console.warn(`   Please ensure ML service is running at: ${mlServiceUrl}`);
+            console.warn(`   You can start it with: cd ml-service && python app.py`);
+        }
+        return false;
+    }
+}
+
+// Run connectivity check asynchronously (non-blocking, won't crash backend)
+if (process.env.NODE_ENV !== 'test') {
+    validateMLServiceReachability().catch(err => {
+        console.warn('⚠️ Background connectivity check failed:', err.message);
+    });
+}
+
 module.exports = validateEnv;
+module.exports.validateMLServiceReachability = validateMLServiceReachability;
