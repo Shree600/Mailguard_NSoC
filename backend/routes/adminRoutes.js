@@ -11,24 +11,35 @@ const { validate, schemas } = require('../middleware/validation');
 const { adminOperationLimiter } = require('../middleware/rateLimiter');
 const { getCacheStats, flushCache, invalidateCacheMiddleware } = require('../middleware/cacheMiddleware');
 
-// All admin routes require authentication, user sync, AND admin role
+// Basic auth for all admin routes
 router.use(authMiddleware);
 router.use(syncUserMiddleware);
-router.use(adminAuth); // Verify admin role for ALL admin routes
+
+/**
+ * GET /api/admin/cache/stats
+ * Get cache performance statistics
+ * 🔐 Explicit admin protection
+ */
+router.get('/cache/stats', adminAuth, getCacheStats);
+
+/**
+ * POST /api/admin/cache/flush
+ * Flush all cached data
+ * 🔐 Explicit admin protection
+ */
+router.post('/cache/flush', adminAuth, adminOperationLimiter, flushCache);
+
+// All remaining routes require admin role
+router.use(adminAuth);
 
 /**
  * POST /api/admin/retrain
  * Trigger model retraining
- * Body (optional):
- * {
- *   dataFile: "training.csv",
- *   modelType: "random_forest" or "logistic"
- * }
  */
 router.post('/retrain', 
   adminOperationLimiter, 
   validate(schemas.retrain), 
-  invalidateCacheMiddleware({ resource: 'classification' }), // Invalidate after retrain
+  invalidateCacheMiddleware({ resource: 'classification' }), 
   adminController.triggerRetraining
 );
 
@@ -41,10 +52,6 @@ router.get('/retrain/status', adminController.getRetrainingStatus);
 /**
  * POST /api/admin/dataset/build
  * Build training dataset from emails and feedback
- * Body (optional):
- * {
- *   outputFile: "training.csv"
- * }
  */
 router.post('/dataset/build', 
   adminOperationLimiter, 
@@ -53,34 +60,14 @@ router.post('/dataset/build',
 );
 
 /**
- * GET /api/admin/cache/stats
- * Get cache performance statistics
- * Returns hit rate, miss rate, keys count, memory usage
- */
-router.get('/cache/stats', getCacheStats);
-
-/**
- * POST /api/admin/cache/flush
- * Flush all cached data
- * USE WITH CAUTION: Impacts all users
- */
-router.post('/cache/flush', adminOperationLimiter, flushCache);
-
-// ============================================
-// NEW ROUTES FOR ISSUE #13
-// ============================================
-
-/**
  * GET /api/admin/ml/status
- * Get ML operation status (lock state, progress, current operation)
- * Returns status of any running retrain/reload operation
+ * Get ML operation status
  */
 router.get('/ml/status', adminController.getMLOperationStatus);
 
 /**
  * POST /api/admin/ml/reload
  * Reload ML models without retraining
- * Useful for applying newly trained models without full retrain pipeline
  */
 router.post('/ml/reload', 
   adminOperationLimiter, 

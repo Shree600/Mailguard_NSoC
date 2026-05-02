@@ -13,6 +13,7 @@ if sys.platform == 'win32':
         sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
+import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -22,6 +23,7 @@ from typing import List, Dict, Any
 import predictor  # Import predictor to load models at startup
 from prediction_cache import get_cache  # NEW: For cache stats endpoint
 import traceback
+from config.cors import get_allowed_origins
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -35,13 +37,14 @@ MAX_ITEM_BYTES = 32_768
 MAX_TOTAL_BYTES = 262_144
 MAX_BATCH_COUNT = 1000
 
-# Configure CORS to allow requests from Node.js backend
+# Configure CORS with explicit trusted origins
+allowed_origins = get_allowed_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
