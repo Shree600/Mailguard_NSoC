@@ -1,5 +1,6 @@
-// Import required packages
 const express = require('express');
+const csrf = require('csurf');
+const csrfProtection = csrf({ cookie: true });
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -75,8 +76,8 @@ app.use(requestLogger);
 app.use('/api/', apiLimiter);
 
 // Enable JSON parsing for incoming requests
-app.use(express.json());
-
+app.use(express.json({ limit: '10kb' }))
+app.use(express.urlencoded({ extended: true, limit: '10kb' }))
 // Enable CORS (Cross-Origin Resource Sharing)
 // Restrict to specific frontend origin for security
 const allowedOrigins = [

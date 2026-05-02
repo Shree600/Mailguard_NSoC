@@ -56,6 +56,10 @@ const gmailFetchSchema = z.object({
   maxResults: z.coerce.number().int().positive().max(500).optional(),
   pageToken: z.string().optional(),
   query: z.string().max(200).optional(),
+  dateFrom: z.union([z.string().datetime(), z.literal('')]).optional().transform(val => val === '' ? undefined : val),
+  dateTo: z.union([z.string().datetime(), z.literal('')]).optional().transform(val => val === '' ? undefined : val),
+  fetchAll: z.boolean().optional(),
+  timeRange: z.enum(['5m', '15m', '30m', '1h', '6h', '12h', '1d', '3d', '7d', '30d', 'all']).optional(),
 });
 
 // Route parameter validation for ObjectId
@@ -96,7 +100,7 @@ const validate = (schema, source = 'body') => {
         return res.status(400).json({
           success: false,
           message: 'Invalid request data',
-          errors: error.errors?.map(err => ({
+          errors: (error.errors || error.issues)?.map(err => ({
             field: err.path.join('.'),
             message: err.message,
           })) || [],
