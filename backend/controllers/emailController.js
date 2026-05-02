@@ -63,7 +63,9 @@ exports.classifyEmails = async (req, res) => {
       phishing: 0,
       safe: 0,
       updated: 0, // Count of re-classifications
-      errors: 0
+      errors: 0,
+      failedEmailIds: [],
+      totalRequested: emailsToClassify.length
     };
 
     for (const email of emailsToClassify) {
@@ -113,23 +115,33 @@ exports.classifyEmails = async (req, res) => {
 
       } catch (error) {
         console.error(`❌ Error classifying email ${email._id}:`, error.message);
-          
-          // Distinguish error types for better debugging
-          if (error.code === 11000) {
-            console.error('   Duplicate key error (should not happen with upsert)');
-          } else if (error.name === 'ValidationError') {
-            console.error('   Validation error:', error.message);
-          }
-          
-          results.errors++;
-        }
+        results.errors++;
+        results.failedEmailIds.push({
+          emailId: email._id.toString(),
+          subject: email.subject || '(No Subject)',
+          reason: error.message
+        });
       }
+    }
+
+    // Validate prediction count equals request count
+    const isPartialFailure = results.errors > 0;
+    const isCompleteFailure = results.processed === 0;
 
     res.json({
-      success: true,
-      message: `Successfully classified ${results.processed} emails` + 
-               (results.updated > 0 ? ` (${results.updated} re-classified)` : ''),
-      stats: results
+      success: !isCompleteFailure,
+      status: isPartialFailure ? 'partial-failure' : 'success',
+      message: isCompleteFailure
+        ? 'Failed to classify any emails'
+        : `Classified ${results.processed}/${results.totalRequested} emails` +
+          (isPartialFailure ? ` (${results.errors} failed)` : ''),
+      stats: results,
+      validation: {
+        expectedCount: results.totalRequested,
+        successCount: results.processed,
+        failureCount: results.errors,
+        failedEmails: results.failedEmailIds
+      }
     });
 
   } catch (error) {
