@@ -1,16 +1,20 @@
+// Load environment variables FIRST - before anything else
+const dotenv = require('dotenv');
+dotenv.config();
+
+// Then all other imports
 const express = require('express');
 const csrf = require('csurf');
 const csrfProtection = csrf({ cookie: true });
 const cors = require('cors');
 const helmet = require('helmet');
-const compression = require('compression');
-const timeout = require('connect-timeout');
-const dotenv = require('dotenv');
+const compression = require('compression');const timeout = require('connect-timeout');
 const connectDB = require('./config/db');
 const validateEnv = require('./config/validateEnv');
 const { startScheduler } = require('./jobs/retrainJob');
 const { startScanJob } = require('./jobs/scanJob');
 
+// ... rest of the file remains the same
 // Load environment variables from .env file
 dotenv.config();
 
