@@ -63,7 +63,9 @@ exports.classifyEmails = async (req, res) => {
       phishing: 0,
       safe: 0,
       updated: 0, // Count of re-classifications
-      errors: 0
+      errors: 0,
+      failedEmailIds: [],
+      totalRequested: emailsToClassify.length
     };
 
     for (const email of emailsToClassify) {
@@ -113,23 +115,45 @@ exports.classifyEmails = async (req, res) => {
 
       } catch (error) {
         console.error(`❌ Error classifying email ${email._id}:`, error.message);
-          
-          // Distinguish error types for better debugging
-          if (error.code === 11000) {
-            console.error('   Duplicate key error (should not happen with upsert)');
-          } else if (error.name === 'ValidationError') {
-            console.error('   Validation error:', error.message);
-          }
-          
-          results.errors++;
+        results.errors++;
+        // Map errors to safe categories (don't expose internal details)
+        let safeReason = 'Prediction service unavailable';
+        if (error.message.includes('timeout')) {
+          safeReason = 'Request timeout';
+        } else if (error.message.includes('not available')) {
+          safeReason = 'ML service unavailable';
+        } else if (error.message.includes('ValidationError')) {
+          safeReason = 'Data validation failed';
         }
+        results.failedEmailIds.push({
+          emailId: email._id.toString(),
+          subject: email.subject || '(No Subject)',
+          reason: safeReason
+        });
       }
+    }
+
+    // Validate prediction count equals request count
+    const totalProcessed = emailsToClassify.length - results.errors; // Processed = total - failed
+    const isPartialFailure = results.errors > 0 && results.processed > 0; // Some failed, some succeeded
+    const isCompleteFail = results.processed === 0 && results.errors > 0; // All failed
+    const isSuccess = results.errors === 0; // None failed
 
     res.json({
-      success: true,
-      message: `Successfully classified ${results.processed} emails` + 
-               (results.updated > 0 ? ` (${results.updated} re-classified)` : ''),
-      stats: results
+      success: isSuccess || isPartialFailure,
+      status: isSuccess ? 'success' : (isPartialFailure ? 'partial-failure' : 'complete-failure'),
+      message: isSuccess
+        ? `Classified all ${results.processed} emails`
+        : isPartialFailure
+        ? `Classified ${results.processed}/${results.totalRequested} emails (${results.errors} failed)`
+        : `Failed to classify all ${results.totalRequested} emails`,
+      stats: results,
+      validation: {
+        totalRequested: results.totalRequested,
+        succeeded: results.processed,
+        failed: results.errors,
+        failedEmails: results.failedEmailIds
+      }
     });
 
   } catch (error) {
