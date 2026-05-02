@@ -1,10 +1,11 @@
 // Test script to verify partial failure handling in batch email classification
 // Usage: node test-partial-failure.js
 
+require('dotenv').config();
 const axios = require('axios');
 
 const API_BASE_URL = process.env.API_URL || 'http://localhost:3000';
-const AUTH_TOKEN = process.env.TEST_AUTH_TOKEN; // Set this in .env
+const AUTH_TOKEN = process.env.TEST_AUTH_TOKEN;
 
 /**
  * Test 1: Verify response includes failed email IDs
@@ -55,17 +56,17 @@ async function testPartialFailureResponse() {
 }
 
 /**
- * Test 2: Verify complete failure handling
+ * Test 2: Verify complete failure handling (requires ML service to be down)
  */
 async function testCompleteFailure() {
-  console.log('\n🧪 TEST 2: Complete Failure Handling');
+  console.log('\n🧪 TEST 2: Complete Failure Handling (requires ML service DOWN)');
   console.log('='.repeat(50));
   
   try {
     // Try to classify when ML service is down
     const response = await axios.post(
       `${API_BASE_URL}/api/emails/classify`,
-      { forceReclassify: true },
+      { forceReclassify: false },
       {
         headers: {
           'Authorization': `Bearer ${AUTH_TOKEN}`,
@@ -77,12 +78,16 @@ async function testCompleteFailure() {
 
     console.log('Response:', JSON.stringify(response.data, null, 2));
     
-    if (response.data.success === false && response.data.status === 'partial-failure') {
-      console.log('✅ Complete failure properly handled with success: false');
+    if (response.data.status === 'complete-failure') {
+      console.log('✅ Complete failure properly handled');
     }
 
   } catch (error) {
-    console.error('Expected error (for testing):', error.message);
+    if (error.response?.status === 503) {
+      console.log('✅ ML service health check failed (503) - expected behavior');
+    } else {
+      console.log('⚠️  Error:', error.message);
+    }
   }
 }
 
@@ -138,6 +143,9 @@ async function runAllTests() {
 
   await testPartialFailureResponse();
   await testValidationCounters();
+  
+  // Uncomment to test complete failure (requires ML service to be DOWN)
+  // await testCompleteFailure();
   
   console.log('\n' + '='.repeat(50));
   console.log('✅ All tests completed');
