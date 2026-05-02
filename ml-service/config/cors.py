@@ -13,6 +13,9 @@ def get_allowed_origins() -> List[str]:
     
     Returns:
         List of allowed origin URLs
+        
+    Raises:
+        ValueError: If invalid patterns (like wildcards) are detected
     """
     node_env = os.getenv("NODE_ENV", "development")
     
@@ -32,6 +35,19 @@ def get_allowed_origins() -> List[str]:
     
     if custom_origins_env:
         custom_origins = [o.strip() for o in custom_origins_env.split(",") if o.strip()]
+        
+        # Validate origins - reject wildcards and invalid patterns
+        for origin in custom_origins:
+            if "*" in origin:
+                raise ValueError(
+                    f"Invalid CORS origin '{origin}': wildcard '*' not allowed. "
+                    f"Use explicit origins like 'https://app.example.com'"
+                )
+            if not origin.startswith(("http://", "https://")):
+                raise ValueError(
+                    f"Invalid CORS origin '{origin}': must start with http:// or https://"
+                )
+        
         default_origins.extend(custom_origins)
     
     # In production, require explicit origins
