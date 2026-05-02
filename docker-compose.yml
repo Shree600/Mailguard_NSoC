@@ -65,8 +65,8 @@ services:
       - DATASET_DIR=/app/datasets
       # Node environment for CORS configuration
       - NODE_ENV=${NODE_ENV:-development}
-      # CORS origins (comma-separated URLs)
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5000}
+      # CORS origins (comma-separated URLs); set explicitly for production
+      - CORS_ORIGINS=${CORS_ORIGINS}
     ports:
       - "8000:8000"
     volumes:
