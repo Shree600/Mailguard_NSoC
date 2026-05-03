@@ -4,8 +4,6 @@ dotenv.config();
 
 // Then all other imports
 const express = require('express');
-const csrf = require('csurf');
-const csrfProtection = csrf({ cookie: true });
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');const timeout = require('connect-timeout');
@@ -121,6 +119,7 @@ const feedbackRoutes = require('./routes/feedbackRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const migrationRoutes = require('./routes/migrationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const deletionRoutes = require('./routes/deletionRoutes');
 
 // Test route - verifies server is running
 app.get('/', (req, res) => {
@@ -150,6 +149,9 @@ app.use('/api/migration', timeout('90s'), migrationRoutes); // 90s for migration
 
 // Mount analytics routes
 app.use('/api/analytics', timeout('45s'), analyticsRoutes); // 45s for analytics operations
+
+// Mount deletion audit routes
+app.use('/api/deletion', timeout('30s'), deletionRoutes);
 
 // ================================================
 // ERROR HANDLING
