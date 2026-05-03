@@ -1,6 +1,15 @@
 // Import mongoose for schema creation
 const mongoose = require('mongoose');
 
+const EMAIL_FIELD_MAX_LENGTHS = {
+  gmailId: 255,
+  body: 100000,
+  htmlBody: 500000,
+  threadId: 255,
+  snippet: 1000,
+  labelId: 128,
+};
+
 /**
  * Email Schema Definition
  * Stores emails fetched from Gmail for phishing analysis
@@ -21,6 +30,10 @@ const emailSchema = new mongoose.Schema(
       required: [true, 'Gmail ID is required'],
       unique: true, // Prevents duplicate emails
       index: true, // Index for faster lookups
+      maxlength: [
+        EMAIL_FIELD_MAX_LENGTHS.gmailId,
+        `Gmail ID cannot exceed ${EMAIL_FIELD_MAX_LENGTHS.gmailId} characters`,
+      ],
     },
 
     // Email sender (from address)
@@ -46,12 +59,20 @@ const emailSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Body is required'],
       default: '',
+      maxlength: [
+        EMAIL_FIELD_MAX_LENGTHS.body,
+        `Body cannot exceed ${EMAIL_FIELD_MAX_LENGTHS.body} characters`,
+      ],
     },
 
     // Original HTML body (if available)
     htmlBody: {
       type: String,
       default: null,
+      maxlength: [
+        EMAIL_FIELD_MAX_LENGTHS.htmlBody,
+        `HTML body cannot exceed ${EMAIL_FIELD_MAX_LENGTHS.htmlBody} characters`,
+      ],
     },
 
     // Timestamp when email was received in Gmail
@@ -90,9 +111,29 @@ const emailSchema = new mongoose.Schema(
 
     // Additional metadata
     metadata: {
-      threadId: String, // Gmail thread ID
-      labelIds: [String], // Gmail labels
-      snippet: String, // Email preview snippet
+      threadId: {
+        type: String,
+        maxlength: [
+          EMAIL_FIELD_MAX_LENGTHS.threadId,
+          `Thread ID cannot exceed ${EMAIL_FIELD_MAX_LENGTHS.threadId} characters`,
+        ],
+      }, // Gmail thread ID
+      labelIds: [
+        {
+          type: String,
+          maxlength: [
+            EMAIL_FIELD_MAX_LENGTHS.labelId,
+            `Label ID cannot exceed ${EMAIL_FIELD_MAX_LENGTHS.labelId} characters`,
+          ],
+        },
+      ], // Gmail labels
+      snippet: {
+        type: String,
+        maxlength: [
+          EMAIL_FIELD_MAX_LENGTHS.snippet,
+          `Snippet cannot exceed ${EMAIL_FIELD_MAX_LENGTHS.snippet} characters`,
+        ],
+      }, // Email preview snippet
       hasAttachments: { type: Boolean, default: false },
     },
   },
