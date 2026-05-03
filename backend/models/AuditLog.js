@@ -54,11 +54,11 @@ const auditLogSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Recovery status
+    // Audit lifecycle status
     status: {
       type: String,
-      enum: ['deleted', 'recovered'],
-      default: 'deleted',
+      enum: ['pending', 'deleted', 'recovered', 'failed'],
+      default: 'pending',
     },
 
     // Additional notes
