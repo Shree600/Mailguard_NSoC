@@ -10,6 +10,7 @@ const cron = require('node-cron');
 const User = require('../models/User');
 const Email = require('../models/Email');
 const Classification = require('../models/Classification');
+const AuditLog = require('../models/AuditLog');
 const gmailService = require('../services/gmailService');
 const mlService = require('../services/mlService');
 
@@ -88,45 +89,80 @@ const scanAndCleanForUser = async (user) => {
     const phishingCount = predictions.filter(p => p.prediction === 'phishing').length;
     console.log(`🚨 Found ${phishingCount} phishing emails`);
 
-    // Step 7: Auto-delete phishing emails
+    // Step 7: Auto-delete phishing emails (only if user consented)
     let deletedCount = 0;
 
     if (phishingCount > 0) {
-      console.log(`🧹 Auto-deleting ${phishingCount} phishing emails...`);
+      // Check user consent before deletion
+      if (!user.autoDeletePreferences?.enabled) {
+        console.log(`⚠️  User ${user.email} has auto-delete DISABLED. Skipping deletion.`);
+      } else {
+        console.log(`✅ User ${user.email} has auto-delete ENABLED. Processing deletions...`);
 
-      const phishingEmailIds = predictions
-        .filter(p => p.prediction === 'phishing')
-        .map(p => p.emailId);
+        const phishingEmailIds = predictions
+          .filter(p => p.prediction === 'phishing')
+          .map(p => p.emailId);
 
-      const phishingEmails = await Email.find({
-        _id: { $in: phishingEmailIds },
-        userId: user._id
-      });
+        const phishingEmails = await Email.find({
+          _id: { $in: phishingEmailIds },
+          userId: user._id
+        });
 
-      for (const email of phishingEmails) {
-        try {
-          // Delete from Gmail
-          await gmailService.deleteEmail(
-            email.gmailId,
-            user.gmailAccessToken,
-            user.gmailRefreshToken
-          );
+        for (const email of phishingEmails) {
+          const phishingPrediction = predictions.find(p => p.emailId.toString() === email._id.toString());
 
-          // Delete classification
-          await Classification.deleteOne({ emailId: email._id });
+          try {
+            // Create audit log BEFORE deletion
+            await AuditLog.create({
+              userId: user._id,
+              emailId: email._id,
+              gmailId: email.gmailId,
+              emailSubject: email.subject,
+              emailSender: email.sender,
+              reason: 'phishing_auto_delete',
+              mlConfidence: phishingPrediction.confidence,
+              notes: `Auto-deleted with ${(phishingPrediction.confidence * 100).toFixed(1)}% confidence`,
+            });
 
-          // Delete from database
-          await Email.deleteOne({ _id: email._id });
+            // Delete from Gmail
+            await gmailService.deleteEmail(
+              email.gmailId,
+              user.gmailAccessToken,
+              user.gmailRefreshToken
+            );
 
-          deletedCount++;
-          console.log(`✅ Deleted phishing: ${email.subject}`);
+            // Delete classification
+            await Classification.deleteOne({ emailId: email._id });
 
-        } catch (deleteError) {
-          console.error(`❌ Failed to delete ${email.gmailId}: ${deleteError.message}`);
+            // Delete from database
+            await Email.deleteOne({ _id: email._id });
+
+            deletedCount++;
+            console.log(`✅ Deleted & logged: ${email.subject}`);
+
+          } catch (deleteError) {
+            console.error(`❌ Failed to delete ${email.gmailId}: ${deleteError.message}`);
+            
+            // Log the error in audit
+            try {
+              await AuditLog.create({
+                userId: user._id,
+                emailId: email._id,
+                gmailId: email.gmailId,
+                emailSubject: email.subject,
+                emailSender: email.sender,
+                reason: 'phishing_auto_delete',
+                mlConfidence: phishingPrediction?.confidence,
+                notes: `FAILED - ${deleteError.message}`,
+              });
+            } catch (auditError) {
+              console.error('Audit log creation failed:', auditError.message);
+            }
+          }
         }
-      }
 
-      console.log(`✅ Auto-deleted ${deletedCount} phishing emails`);
+        console.log(`✅ Auto-deleted ${deletedCount} phishing emails`);
+      }
     }
 
     // Step 8: Return results
