@@ -344,15 +344,31 @@ export const classifyEmails = async () => {
 // ================================
 
 /**
- * Migrate all emails to current user
+ * Migrate emails to current user (admin only, requires sourceUserId or emailIds)
+ * @param {Object} data - Contains sourceUserId or emailIds array
  * @returns {Promise} Migration results
  */
-export const migrateEmails = async () => {
+export const migrateEmails = async (data = {}) => {
   try {
-    const response = await api.post('/migration/update-emails')
+    const response = await api.post('/migration/update-emails', data)
     return response.data
   } catch (error) {
     logger.error('❌ Failed to migrate emails:', error)
+    throw error
+  }
+}
+
+/**
+ * Rollback a completed migration (admin only)
+ * @param {string} migrationId - ID of the migration to rollback
+ * @returns {Promise} Rollback results
+ */
+export const rollbackMigration = async (migrationId) => {
+  try {
+    const response = await api.post('/migration/rollback', { migrationId })
+    return response.data
+  } catch (error) {
+    logger.error('❌ Failed to rollback migration:', error)
     throw error
   }
 }
