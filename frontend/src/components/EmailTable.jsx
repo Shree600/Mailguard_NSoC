@@ -107,7 +107,7 @@ function EmailTable({
                     checked={selectedEmails.length === emails.length && emails.length > 0}
                     onChange={(e) => onSelectAll(e.target.checked)}
                     className="w-4 h-4 text-blue-500 bg-slate-700 border-slate-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
-                    title="Select all emails"
+                    aria-label="Select all emails"
                   />
                 </TableHead>
                 <TableHead className="min-w-[300px] text-slate-300 font-semibold">
@@ -146,7 +146,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
     
     if (prediction === 'phishing') {
       return (
-        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-semibold text-sm shadow-sm">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-semibold text-sm shadow-sm" aria-label="Email classified as phishing">
           <span className="text-base">🚨</span>
           <span>Phishing</span>
         </div>
@@ -214,6 +214,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
         <input
           type="checkbox"
           checked={isSelected}
+          aria-label={`Select email from ${email.sender || email.from}`}
           onChange={(e) => {
             e.stopPropagation()
             onSelect(email._id)
@@ -262,7 +263,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
             size="sm"
             onClick={() => onFeedback(email._id, 'correct')}
             className="h-9 px-3 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/50 transition-all duration-200"
-            title="Mark as Correct ✓"
+            aria-label="Mark email as correct"
           >
             <ThumbsUp className="h-4 w-4 mr-1" />
             <span className="text-xs font-semibold">Correct</span>
@@ -274,7 +275,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
             size="sm"
             onClick={() => onFeedback(email._id, 'wrong')}
             className="h-9 px-3 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-500/50 transition-all duration-200"
-            title="Mark as Wrong ✗"
+            aria-label="Mark email as incorrect"
           >
             <AlertTriangle className="h-4 w-4 mr-1" />
             <span className="text-xs font-semibold">Wrong</span>
@@ -287,7 +288,7 @@ function EmailRow({ email, onDelete, onFeedback, isSelected, onSelect }) {
               size="sm"
               onClick={() => onDelete(email._id)}
               className="h-9 px-3 text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-200"
-              title="Delete Email 🗑️"
+              aria-label="Delete phishing email"
             >
               <Trash2 className="h-4 w-4 mr-1" />
               <span className="text-xs font-semibold">Delete</span>
