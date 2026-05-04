@@ -80,6 +80,8 @@ function Dashboard() {
 
   // Migration state
   const [migrationNeeded, setMigrationNeeded] = useState(false)
+  const [migrationCount, setMigrationCount] = useState(0)
+  const [migrationLoading, setMigrationLoading] = useState(true)
   const [migrating, setMigrating] = useState(false)
 
   // Filter and pagination state
@@ -128,6 +130,16 @@ function Dashboard() {
     onConfirm: null,
     variant: 'destructive' // or 'default'
   })
+
+  const openConfirmDialog = ({ title, description, onConfirm, variant = 'destructive' }) => {
+    setConfirmDialog({
+      open: true,
+      title,
+      description,
+      onConfirm,
+      variant
+    })
+  }
 
   // Fetch stats and emails on component mount
   useEffect(() => {
@@ -203,7 +215,9 @@ function Dashboard() {
   
   const checkGmailConnection = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/gmail/status', {
+     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+
+const response = await fetch(`${API_BASE}/gmail/status`, {
         headers: {
           'Authorization': `Bearer ${await window.Clerk.session?.getToken()}`
         }
@@ -219,16 +233,19 @@ function Dashboard() {
 
   const checkMigrationStatus = async () => {
     try {
+      setMigrationLoading(true)
       const response = await getMigrationStatus()
-      setMigrationNeeded(response.needsMigration || false)
+      setMigrationNeeded(response.needsMigration === true)
       
       if (response.needsMigration) {
-        console.log('⚠️ Migration needed:', response.emailCounts.otherUsers, 'emails')
+        setMigrationCount(response.emailCounts?.otherUsers || 0)
+        console.log('⚠️ Migration needed:', response.emailCounts?.otherUsers, 'emails')
       }
-      setMigrationNeeded(false)
-      // Don't show toast for this - it's checked on load and shouldn't be intrusive
     } catch (err) {
       console.error('❌ Failed to check migration status:', err)
+      toast.error('Failed to check account migration status.')
+    } finally {
+      setMigrationLoading(false)
     }
   }
 
@@ -253,58 +270,63 @@ function Dashboard() {
       return
     }
 
-    if (!window.confirm(`Retrain the AI model with ${feedbackStats.count} feedback entries?\n\nThis may take a few minutes.`)) {
-      return
-    }
-
-    try {
-      setRetraining(true)
-      toast.info('Starting model retraining... This may take 2-5 minutes.')
-      
-      const response = await triggerRetrain()
-      
-      console.log('✅ Retrain complete:', response)
-      toast.success('AI model retrained successfully! The model will now be more accurate.')
-      
-      // Optionally refresh stats
-      await fetchFeedbackStats()
-    } catch (err) {
-      console.error('❌ Failed to retrain model:', err)
-      const errorMsg = err.response?.data?.error || err.message || 'Failed to retrain model'
-      toast.error(errorMsg)
-    } finally {
-      setRetraining(false)
-    }
+    openConfirmDialog({
+      title: 'Retrain AI Model',
+      description: `Retrain the AI model with ${feedbackStats.count} feedback entries? This may take a few minutes.`,
+      variant: 'default',
+      onConfirm: async () => {
+        try {
+          setRetraining(true)
+          toast.info('Starting model retraining... This may take 2-5 minutes.')
+          
+          const response = await triggerRetrain()
+          
+          console.log('✅ Retrain complete:', response)
+          toast.success('AI model retrained successfully! The model will now be more accurate.')
+          
+          // Optionally refresh stats
+          await fetchFeedbackStats()
+        } catch (err) {
+          console.error('❌ Failed to retrain model:', err)
+          const errorMsg = err.response?.data?.error || err.message || 'Failed to retrain model'
+          toast.error(errorMsg)
+        } finally {
+          setRetraining(false)
+        }
+      }
+    })
   }
 
   const handleMigrateEmails = async () => {
-    if (!window.confirm('This will update all existing emails to belong to your account. Continue?')) {
-      return
-    }
-
-    try {
-      setMigrating(true)
-      const response = await migrateEmails()
-      
-      console.log('✅ Migration complete:', response)
-      toast.success(`Successfully migrated ${response.updated} emails to your account!`)
-      
-      // Refresh everything
-      setMigrationNeeded(false)
-      await fetchStats()
-      await fetchEmails()
-    } catch (err) {
-      console.error('❌ Migration failed:', err)
-      toast.error('Failed to migrate emails. Please try again.')
-    } finally {
-      setMigrating(false)
-    }
+    openConfirmDialog({
+      title: 'Migrate Emails',
+      description: 'This will update all existing emails to belong to your account. Continue?',
+      onConfirm: async () => {
+        try {
+          setMigrating(true)
+          const response = await migrateEmails()
+          
+          console.log('✅ Migration complete:', response)
+          toast.success(`Successfully migrated ${response.updated} emails to your account!`)
+          
+          // Refresh everything
+          setMigrationNeeded(false)
+          setMigrationCount(0)
+          await fetchStats()
+          await fetchEmails()
+        } catch (err) {
+          console.error('❌ Migration failed:', err)
+          toast.error('Failed to migrate emails. Please try again.')
+        } finally {
+          setMigrating(false)
+        }
+      }
+    })
   }
 
   const handleDelete = async (emailId) => {
     // Show confirmation dialog
-    setConfirmDialog({
-      open: true,
+    openConfirmDialog({
       title: 'Delete Email',
       description: 'Are you sure you want to delete this email? This action cannot be undone.',
       variant: 'destructive',
@@ -382,10 +404,13 @@ function Dashboard() {
       
       // Handle specific error types
       if (err.response?.status === 403) {
-        const shouldMigrate = window.confirm('⚠️ MIGRATION NEEDED!\n\nThis email belongs to your old account. Click OK to automatically migrate ALL emails to your current account.\n\nThis will fix the feedback errors for all emails.')
-        if (shouldMigrate) {
-          handleMigrateEmails()
-        }
+        openConfirmDialog({
+          title: 'Migration Needed',
+          description: 'This email belongs to your old account. Continue to automatically migrate ALL emails to your current account? This will fix the feedback errors for all emails.',
+          onConfirm: async () => {
+            await handleMigrateEmails()
+          }
+        })
       } else if (err.response?.status === 400) {
         toast.error(err.response?.data?.error || 'Invalid feedback data')
       } else {
@@ -427,8 +452,7 @@ function Dashboard() {
     }
     
     // Show confirmation dialog
-    setConfirmDialog({
-      open: true,
+    openConfirmDialog({
       title: 'Delete Multiple Emails',
       description: `Are you sure you want to delete ${selectedEmails.length} email(s)? This action cannot be undone.`,
       variant: 'destructive',
@@ -463,8 +487,7 @@ function Dashboard() {
   // Handle clean all phishing emails
   const handleCleanPhishing = async () => {
     // Show confirmation dialog
-    setConfirmDialog({
-      open: true,
+    openConfirmDialog({
       title: 'Delete All Phishing Emails',
       description: 'Are you sure you want to delete ALL phishing emails? This will permanently remove all detected phishing emails from your inbox.',
       variant: 'destructive',
@@ -488,15 +511,16 @@ function Dashboard() {
           if (result.results.deleted > 0) {
             toast.success(`Successfully cleaned ${result.results.deleted} phishing email(s)! Storage saved: ${result.results.storageSaved.mb} MB`)
             
-            const shouldFetchMore = window.confirm(
-              `Would you like to fetch more emails from Gmail to replace the deleted ones?`
-            )
-            
-            if (shouldFetchMore) {
-              // Auto-fetch more emails (skip confirmation since user already confirmed)
-              await handleFetchEmails(true)
-              return // handleFetchEmails already refreshes
-            }
+            openConfirmDialog({
+              title: 'Fetch More Emails',
+              description: 'Would you like to fetch more emails from Gmail to replace the deleted ones?',
+              variant: 'default',
+              onConfirm: async () => {
+                // Auto-fetch more emails (skip confirmation since user already confirmed)
+                await handleFetchEmails(true)
+              }
+            })
+            return
           } else {
             toast.info('No phishing emails found to clean.')
           }
@@ -513,16 +537,20 @@ function Dashboard() {
   }
 
   const handleLogout = async () => {
-    if (window.confirm('Are you sure you want to logout?')) {
-      await signOut()
-    }
+    openConfirmDialog({
+      title: 'Sign Out',
+      description: 'Are you sure you want to logout?',
+      variant: 'default',
+      onConfirm: async () => {
+        await signOut()
+      }
+    })
   }
   
   // Handle clearing all emails from database
   const handleClearAllEmails = () => {
-    setConfirmDialog({
-      open: true,
-      title: '⚠️ Clear All Emails',
+    openConfirmDialog({
+      title: 'Clear All Emails',
       description: 'This will permanently delete ALL emails from the database (not from Gmail). This action cannot be undone. Are you sure?',
       variant: 'destructive',
       onConfirm: async () => {
@@ -559,62 +587,91 @@ function Dashboard() {
   
   // Handle fetching emails from Gmail
   const handleFetchEmails = async (skipConfirm = false) => {
-    if (!skipConfirm && !showFetchOptions && !window.confirm('Fetch latest emails from Gmail and scan for phishing?')) {
+    const runFetchEmails = async () => {
+      try {
+        setFetchingEmails(true)
+        
+        // Step 1: Fetch emails from Gmail with user options
+        const fetchResponse = await fetchGmailEmails(gmailFetchOptions)
+        console.log('✅ Emails fetched:', fetchResponse)
+        
+        // Step 2: Classify the emails
+        console.log('🤖 Classifying emails...')
+        const classifyResponse = await classifyEmails()
+        console.log('✅ Emails classified:', classifyResponse)
+        
+        const message = `Fetched ${fetchResponse.data.fetched} emails (${fetchResponse.data.saved} new)! Classified: ${classifyResponse.stats.processed} emails - Phishing: ${classifyResponse.stats.phishing} | Safe: ${classifyResponse.stats.safe}`
+        
+        if (!skipConfirm) {
+          toast.success(message, { duration: 5000 })
+        }
+        
+        // Refresh emails and stats
+        fetchEmails()
+        fetchStats()
+        setShowFetchOptions(false) // Close options dialog
+        
+        // Auto-refetch if we got all new emails (means there might be more)
+        if (fetchResponse.data.shouldRefetch && fetchResponse.data.saved === fetchResponse.data.fetched) {
+          openConfirmDialog({
+            title: 'Fetch More Emails',
+            description: 'All fetched emails were new. Would you like to fetch more?',
+            variant: 'default',
+            onConfirm: async () => {
+              await handleFetchEmails(true)
+            }
+          })
+        }
+      } catch (err) {
+        console.error('❌ Failed to fetch emails:', err)
+        
+        // Check if Gmail not connected
+        if (err.response?.status === 400) {
+          toast.error('Gmail not connected. Please connect your Gmail account first.')
+        } else {
+          toast.error('Failed to fetch emails. Please try again.')
+        }
+      } finally {
+        setFetchingEmails(false)
+      }
+    }
+
+    if (!skipConfirm && !showFetchOptions) {
+      openConfirmDialog({
+        title: 'Fetch & Scan Emails',
+        description: 'Fetch latest emails from Gmail and scan for phishing?',
+        variant: 'default',
+        onConfirm: async () => {
+          await runFetchEmails()
+        }
+      })
       return
     }
-    
-    try {
-      setFetchingEmails(true)
-      
-      // Step 1: Fetch emails from Gmail with user options
-      const fetchResponse = await fetchGmailEmails(gmailFetchOptions)
-      console.log('✅ Emails fetched:', fetchResponse)
-      
-      // Step 2: Classify the emails
-      console.log('🤖 Classifying emails...')
-      const classifyResponse = await classifyEmails()
-      console.log('✅ Emails classified:', classifyResponse)
-      
-      const message = `Fetched ${fetchResponse.data.fetched} emails (${fetchResponse.data.saved} new)! Classified: ${classifyResponse.stats.processed} emails - Phishing: ${classifyResponse.stats.phishing} | Safe: ${classifyResponse.stats.safe}`
-      
-      if (!skipConfirm) {
-        toast.success(message, { duration: 5000 })
-      }
-      
-      // Refresh emails and stats
-      fetchEmails()
-      fetchStats()
-      setShowFetchOptions(false) // Close options dialog
-      
-      // Auto-refetch if we got all new emails (means there might be more)
-      if (fetchResponse.data.shouldRefetch && fetchResponse.data.saved === fetchResponse.data.fetched) {
-        const fetchMore = window.confirm('All fetched emails were new! Would you like to fetch more?')
-        if (fetchMore) {
-          await handleFetchEmails(true) // Skip confirmation for auto-refetch
-        }
-      }
-    } catch (err) {
-      console.error('❌ Failed to fetch emails:', err)
-      
-      // Check if Gmail not connected
-      if (err.response?.status === 400) {
-        toast.error('Gmail not connected. Please connect your Gmail account first.')
-      } else {
-        toast.error('Failed to fetch emails. Please try again.')
-      }
-    } finally {
-      setFetchingEmails(false)
-    }
+
+    await runFetchEmails()
   }
 
   return (
     <div className="space-y-6">
       {/* Migration Warning Banner */}
-      {migrationNeeded && (
-        <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-6">
+      {migrationLoading ? (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 animate-pulse">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="p-3 bg-yellow-100 rounded-lg">
+              <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+              <div className="space-y-2">
+                <div className="h-5 bg-gray-200 rounded w-48"></div>
+                <div className="h-4 bg-gray-200 rounded w-96"></div>
+              </div>
+            </div>
+            <div className="w-28 h-12 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+      ) : migrationNeeded && (
+        <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-yellow-100 rounded-lg flex-shrink-0">
                 <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -622,36 +679,53 @@ function Dashboard() {
               <div>
                 <h3 className="text-lg font-semibold text-yellow-900 mb-1">⚠️ Email Migration Required</h3>
                 <p className="text-sm text-yellow-700">
-                  Your existing emails need to be migrated to your new Clerk account. Click "Fix Now" to update ownership.
+                  {migrationCount > 0 ? `You have ${migrationCount} existing email(s) that need ` : 'Your existing emails need '}
+                  to be migrated to your new Clerk account. Click "Fix Now" to update ownership.
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleMigrateEmails}
-              disabled={migrating}
-              className={`px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center space-x-2 ${
-                migrating
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-              }`}
-            >
-              {migrating ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span>Migrating...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Fix Now</span>
-                </>
-              )}
-            </button>
+            <div className="flex space-x-3 w-full sm:w-auto">
+              <button
+                onClick={checkMigrationStatus}
+                disabled={migrating}
+                title="Retry check"
+                className={`px-4 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 ${
+                  migrating
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <button
+                onClick={handleMigrateEmails}
+                disabled={migrating}
+                className={`flex-1 sm:flex-none px-6 py-3 rounded-lg font-semibold transition duration-200 flex items-center justify-center space-x-2 ${
+                  migrating
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-yellow-600 hover:bg-yellow-700 text-white shadow-md'
+                }`}
+              >
+                {migrating ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Migrating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Fix Now</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

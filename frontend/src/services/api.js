@@ -3,7 +3,28 @@
  * Centralized service for all backend API calls
  * Uses Axios for HTTP requests with Clerk authentication
  */
+// ================================
+// LOGGER UTILITY
+// ================================
+const isProd = import.meta.env.MODE === 'production';
 
+const logger = {
+  log: (...args) => { if (!isProd)logger.log(...args); },
+  warn: (...args) => { if (!isProd) logger.warn(...args); },
+  error: (...args) => logger.error(...args), // always show errors
+};
+
+const EmailSchema = z.object({
+  id: z.string().or(z.number()),
+  subject: z.string(),
+  sender: z.string(),
+});
+
+function validate(schema, data) {
+  const r = schema.safeParse(data);
+  if (!r.success) { console.error("❌ Validation failed", r.error); return null; }
+  return r.data;
+}
 import axios from 'axios'
 
 // Backend API base URL
@@ -28,7 +49,7 @@ api.interceptors.request.use(
       
       // Check if Clerk is configured
       if (!clerkPublishableKey) {
-        console.warn('⚠️  Clerk not configured - requests will fail authentication')
+        logger.warn('⚠️  Clerk not configured - requests will fail authentication')
         return config
       }
       
@@ -41,8 +62,8 @@ api.interceptors.request.use(
       
       // Check if Clerk loaded successfully
       if (!window.Clerk) {
-        console.error('❌ Clerk failed to load after 5 seconds')
-        console.warn('⚠️  Request will be sent without authentication token')
+        logger.error('❌ Clerk failed to load after 5 seconds')
+        logger.warn('⚠️  Request will be sent without authentication token')
         return config
       }
       
@@ -52,20 +73,20 @@ api.interceptors.request.use(
       // If token exists, add to Authorization header
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
-        console.log('✅ Auth token added to request')
+       logger.log('✅ Auth token added to request')
       } else {
-        console.warn('⚠️  No Clerk session token available - user may not be authenticated')
+        logger.warn('⚠️  No Clerk session token available - user may not be authenticated')
       }
     } catch (error) {
-      console.error('❌ Failed to get Clerk token:', error)
-      console.warn('⚠️  Request will proceed without authentication')
+      logger.error('❌ Failed to get Clerk token:', error)
+      logger.warn('⚠️  Request will proceed without authentication')
     }
     
-    console.log('🚀 API Request:', config.method.toUpperCase(), config.url)
+   logger.log('🚀 API Request:', config.method.toUpperCase(), config.url)
     return config
   },
   (error) => {
-    console.error('❌ Request Error:', error)
+    logger.error('❌ Request Error:', error)
     return Promise.reject(error)
   }
 )
@@ -73,14 +94,14 @@ api.interceptors.request.use(
 // Response interceptor - Handle responses and errors
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ API Response:', response.status, response.config.url)
+   logger.log('✅ API Response:', response.status, response.config.url)
     return response
   },
   (error) => {
     // Handle different error scenarios
     if (error.response) {
       // Server responded with error status
-      console.error('❌ API Error:', error.response.status, error.response.data)
+      logger.error('❌ API Error:', error.response.status, error.response.data)
       
       // Handle 401 Unauthorized - redirect to login
       if (error.response.status === 401) {
@@ -88,10 +109,10 @@ api.interceptors.response.use(
       }
     } else if (error.request) {
       // Request made but no response received
-      console.error('❌ No Response:', error.message)
+      logger.error('❌ No Response:', error.message)
     } else {
       // Error in request setup
-      console.error('❌ Request Setup Error:', error.message)
+      logger.error('❌ Request Setup Error:', error.message)
     }
     
     return Promise.reject(error)
@@ -122,9 +143,9 @@ api.interceptors.response.use(
 export const getEmails = async (params = {}) => {
   try {
     const response = await api.get('/emails', { params })
-    return response.data
+  return validate(EmailListSchema, response.data, "GET /emails")
   } catch (error) {
-    console.error('❌ Failed to fetch emails:', error)
+    logger.error('❌ Failed to fetch emails:', error)
     throw error
   }
 }
@@ -136,9 +157,9 @@ export const getEmails = async (params = {}) => {
 export const getEmailStats = async () => {
   try {
     const response = await api.get('/emails/stats')
-    return response.data
+ return validate(StatsSchema, response.data, "GET /emails/stats")
   } catch (error) {
-    console.error('❌ Failed to fetch email stats:', error)
+    logger.error('❌ Failed to fetch email stats:', error)
     throw error
   }
 }
@@ -153,7 +174,7 @@ export const deleteEmail = async (emailId) => {
     const response = await api.delete(`/emails/${emailId}`)
     return response.data
   } catch (error) {
-    console.error('❌ Failed to delete email:', error)
+    logger.error('❌ Failed to delete email:', error)
     throw error
   }
 }
@@ -168,7 +189,7 @@ export const bulkDeleteEmails = async (emailIds) => {
     const response = await api.post('/emails/bulk-delete', { emailIds })
     return response.data
   } catch (error) {
-    console.error('❌ Failed to bulk delete emails:', error)
+    logger.error('❌ Failed to bulk delete emails:', error)
     throw error
   }
 }
@@ -182,7 +203,7 @@ export const cleanPhishingEmails = async () => {
     const response = await api.post('/emails/clean-phishing')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to clean phishing emails:', error)
+    logger.error('❌ Failed to clean phishing emails:', error)
     throw error
   }
 }
@@ -196,7 +217,7 @@ export const clearAllEmails = async () => {
     const response = await api.post('/emails/clear-all')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to clear all emails:', error)
+    logger.error('❌ Failed to clear all emails:', error)
     throw error
   }
 }
@@ -217,7 +238,7 @@ export const submitFeedback = async (feedbackData) => {
     const response = await api.post('/feedback', feedbackData)
     return response.data
   } catch (error) {
-    console.error('❌ Failed to submit feedback:', error)
+    logger.error('❌ Failed to submit feedback:', error)
     throw error
   }
 }
@@ -231,7 +252,7 @@ export const getFeedback = async () => {
     const response = await api.get('/feedback')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to fetch feedback:', error)
+    logger.error('❌ Failed to fetch feedback:', error)
     throw error
   }
 }
@@ -247,7 +268,7 @@ export const triggerRetrain = async () => {
     const response = await api.post('/admin/retrain', {}, { timeout: 300000 }) // 5 min timeout
     return response.data
   } catch (error) {
-    console.error('❌ Failed to trigger retrain:', error)
+    logger.error('❌ Failed to trigger retrain:', error)
     throw error
   }
 }
@@ -261,7 +282,7 @@ export const getRetrainStatus = async () => {
     const response = await api.get('/admin/retrain/status')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to get retrain status:', error)
+    logger.error('❌ Failed to get retrain status:', error)
     throw error
   }
 }
@@ -279,7 +300,7 @@ export const initiateGmailAuth = async () => {
     const response = await api.get('/gmail/auth')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to initiate Gmail auth:', error)
+    logger.error('❌ Failed to initiate Gmail auth:', error)
     throw error
   }
 }
@@ -299,7 +320,7 @@ export const fetchGmailEmails = async (params = {}) => {
     const response = await api.post('/gmail/fetch', params)
     return response.data
   } catch (error) {
-    console.error('❌ Failed to fetch Gmail emails:', error)
+    logger.error('❌ Failed to fetch Gmail emails:', error)
     throw error
   }
 }
@@ -313,7 +334,7 @@ export const classifyEmails = async () => {
     const response = await api.post('/emails/classify')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to classify emails:', error)
+    logger.error('❌ Failed to classify emails:', error)
     throw error
   }
 }
@@ -331,7 +352,7 @@ export const migrateEmails = async () => {
     const response = await api.post('/migration/update-emails')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to migrate emails:', error)
+    logger.error('❌ Failed to migrate emails:', error)
     throw error
   }
 }
@@ -345,7 +366,7 @@ export const getMigrationStatus = async () => {
     const response = await api.get('/migration/status')
     return response.data
   } catch (error) {
-    console.error('❌ Failed to get migration status:', error)
+    logger.error('❌ Failed to get migration status:', error)
     throw error
   }
 }

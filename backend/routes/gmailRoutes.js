@@ -74,9 +74,9 @@ router.delete('/disconnect', timeout('30s'), authMiddleware, syncUserMiddleware,
 router.post('/fetch', 
   timeout('180s'), // 3 minute timeout for Gmail fetch (handles large email volumes)
   gmailFetchLimiter, 
+  validate(schemas.gmailFetch, 'body'), 
   authMiddleware, 
   syncUserMiddleware, 
-  validate(schemas.gmailFetch, 'query'), 
   invalidateCacheMiddleware(), // Invalidate user cache after fetch
   fetchAndSaveEmails
 );

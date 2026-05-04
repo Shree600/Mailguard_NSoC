@@ -1,6 +1,7 @@
 // Import Gmail OAuth configuration
 const { getGmailClient } = require('../config/googleOAuth');
 const User = require('../models/User');
+const { encryptIfNeeded } = require('../utils/encryption');
 
 /**
  * Gmail Service
@@ -43,7 +44,7 @@ const fetchEmails = async (user, maxResults = 20, searchQuery = 'in:inbox') => {
         try {
           await User.findByIdAndUpdate(user._id, {
             gmailAccessToken: newTokens.accessToken,
-            gmailRefreshToken: newTokens.refreshToken
+            gmailRefreshToken: encryptIfNeeded(newTokens.refreshToken)
           });
           console.log(`✅ Updated refreshed tokens for user: ${user.email}`);
         } catch (error) {
@@ -511,7 +512,7 @@ const getGmailAddress = async (user) => {
         try {
           await User.findByIdAndUpdate(user._id, {
             gmailAccessToken: newTokens.accessToken,
-            gmailRefreshToken: newTokens.refreshToken
+            gmailRefreshToken: encryptIfNeeded(newTokens.refreshToken)
           });
           console.log(`✅ Updated refreshed tokens for user: ${user.email}`);
         } catch (error) {

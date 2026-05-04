@@ -4,6 +4,12 @@ import { defineConfig } from "vite"
 import { visualizer } from "rollup-plugin-visualizer"
 
 export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test-setup.js',
+    // vitest config moved to vitest.config.js to avoid plugin resolution issues
+  },
   plugins: [
     react({
       // Enable React Compiler for automatic optimizations

@@ -1,6 +1,6 @@
 // Import mongoose for schema creation
 const mongoose = require('mongoose');
-const { encrypt, decrypt } = require('../utils/encryption');
+const { encryptIfNeeded, decryptIfNeeded } = require('../utils/encryption');
 
 /**
  * User Schema Definition
@@ -84,16 +84,43 @@ userSchema.pre('save', function (next) {
   try {
     // Only encrypt if gmailRefreshToken is modified and not null
     if (this.isModified('gmailRefreshToken') && this.gmailRefreshToken) {
-      // Check if already encrypted (contains ':' delimiters)
-      if (!this.gmailRefreshToken.includes(':')) {
-        this.gmailRefreshToken = encrypt(this.gmailRefreshToken);
-      }
+      this.gmailRefreshToken = encryptIfNeeded(this.gmailRefreshToken);
     }
     next();
   } catch (error) {
     next(error);
   }
 });
+
+function encryptRefreshTokenUpdate(update) {
+  if (!update || Array.isArray(update)) return;
+
+  if (Object.prototype.hasOwnProperty.call(update, 'gmailRefreshToken')) {
+    update.gmailRefreshToken = encryptIfNeeded(update.gmailRefreshToken);
+  }
+
+  ['$set', '$setOnInsert'].forEach((operator) => {
+    if (
+      update[operator] &&
+      Object.prototype.hasOwnProperty.call(update[operator], 'gmailRefreshToken')
+    ) {
+      update[operator].gmailRefreshToken = encryptIfNeeded(update[operator].gmailRefreshToken);
+    }
+  });
+}
+
+function encryptRefreshTokenInQuery(next) {
+  try {
+    encryptRefreshTokenUpdate(this.getUpdate());
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+userSchema.pre('findOneAndUpdate', encryptRefreshTokenInQuery);
+userSchema.pre('updateOne', encryptRefreshTokenInQuery);
+userSchema.pre('updateMany', encryptRefreshTokenInQuery);
 
 /**
  * Post-find hook: Decrypt Gmail refresh token after retrieval
@@ -102,10 +129,7 @@ userSchema.pre('save', function (next) {
 const decryptRefreshToken = function (doc) {
   if (doc && doc.gmailRefreshToken) {
     try {
-      // Only decrypt if it appears encrypted (has ':' delimiters)
-      if (doc.gmailRefreshToken.includes(':')) {
-        doc.gmailRefreshToken = decrypt(doc.gmailRefreshToken);
-      }
+      doc.gmailRefreshToken = decryptIfNeeded(doc.gmailRefreshToken);
     } catch (error) {
       console.error('❌ Failed to decrypt refresh token:', error.message);
       doc.gmailRefreshToken = null; // Clear corrupted token
