@@ -587,6 +587,109 @@ async def predict_emails_batch_async(texts):
     return await loop.run_in_executor(executor, predict_emails_batch, texts)
 
 
+# ============================================
+# MODEL INTEGRITY CHECK FOR READINESS
+# ============================================
+
+def check_model_integrity():
+    """
+    Verify model and vectorizer are properly loaded and functional.
+    Used by health check endpoint to ensure service is truly ready.
+
+    Returns:
+        tuple: (is_healthy, status_dict)
+            - is_healthy (bool): True if all checks pass
+            - status_dict (dict): Detailed status information
+    """
+    result = {
+        "model_loaded": False,
+        "vectorizer_loaded": False,
+        "smoke_test_passed": False,
+        "errors": [],
+        "warnings": [],
+        "details": {}
+    }
+    
+    # 1. Check if model exists and is loaded
+    global model, vectorizer, model_loaded
+    
+    if model_loaded and model is not None:
+        result["model_loaded"] = True
+        result["details"]["model_type"] = str(type(model).__name__)
+    else:
+        result["errors"].append("Model not loaded or model_loaded flag is False")
+    
+    # 2. Check if vectorizer exists and is loaded
+    if vectorizer is not None:
+        result["vectorizer_loaded"] = True
+        result["details"]["vectorizer_type"] = str(type(vectorizer).__name__)
+        if hasattr(vectorizer, 'get_feature_names_out'):
+            result["details"]["vectorizer_features"] = len(vectorizer.get_feature_names_out())
+        else:
+            result["details"]["vectorizer_features"] = "unknown"
+    else:
+        result["errors"].append("Vectorizer not loaded")
+    
+    # 3. Run smoke prediction test
+    if result["model_loaded"] and result["vectorizer_loaded"]:
+        try:
+            # Simple test email text
+            test_text = "This is a test email for smoke prediction to verify model integrity"
+            
+            # Transform and predict
+            test_vectorized = vectorizer.transform([test_text])
+            test_prediction = model.predict(test_vectorized)[0]
+            
+            # Get prediction probabilities
+            test_probs = model.predict_proba(test_vectorized)[0]
+            
+            result["smoke_test_passed"] = True
+            result["details"]["smoke_prediction"] = "phishing" if test_prediction == 1 else "safe"
+            result["details"]["smoke_confidence"] = float(max(test_probs))
+            result["details"]["smoke_probabilities"] = {
+                "safe": float(test_probs[0]),
+                "phishing": float(test_probs[1])
+            }
+        except Exception as e:
+            result["errors"].append(f"Smoke prediction failed: {str(e)}")
+    
+    # 4. Check model metadata if available
+    global model_metadata
+    if model_metadata:
+        result["details"]["model_version"] = model_metadata.get("version", "unknown")
+        result["details"]["trained_at"] = model_metadata.get("trained_at")
+        if "warning" in model_metadata:
+            result["warnings"].append(model_metadata["warning"])
+    else:
+        result["warnings"].append("No model metadata available - model version unknown")
+    
+    # 5. Check file integrity (if files exist)
+    try:
+        if os.path.exists(MODEL_PATH):
+            model_size = os.path.getsize(MODEL_PATH)
+            result["details"]["model_file_size"] = model_size
+            if model_size < 100:
+                result["warnings"].append(f"Model file size is suspiciously small: {model_size} bytes")
+        
+        if os.path.exists(VECTORIZER_PATH):
+            vectorizer_size = os.path.getsize(VECTORIZER_PATH)
+            result["details"]["vectorizer_file_size"] = vectorizer_size
+            if vectorizer_size < 100:
+                result["warnings"].append(f"Vectorizer file size is suspiciously small: {vectorizer_size} bytes")
+    except Exception as e:
+        result["warnings"].append(f"Could not check file integrity: {str(e)}")
+    
+    # Determine overall health
+    is_healthy = (
+        result["model_loaded"] and 
+        result["vectorizer_loaded"] and 
+        result["smoke_test_passed"] and
+        len(result["errors"]) == 0
+    )
+    
+    return is_healthy, result
+
+
 print("="*50)
 load_models()
 print("="*50 + "\n")
