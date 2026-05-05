@@ -70,6 +70,22 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // ================================================
+    // AUTO-DELETE PREFERENCES (Issue #9)
+    // ================================================
+    autoDeletePreferences: {
+      enabled: {
+        type: Boolean,
+        default: false, // Disabled by default for safety
+      },
+      retentionDays: {
+        type: Number,
+        default: 30,
+        min: [7, 'Minimum retention is 7 days'],
+        max: [90, 'Maximum retention is 90 days'],
+      },
+    },
   },
   {
     // Automatically add createdAt and updatedAt timestamps
