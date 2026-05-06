@@ -14,10 +14,27 @@ const logger = {
   error: (...args) => logger.error(...args), // always show errors
 };
 
+import { z } from 'zod';
+
 const EmailSchema = z.object({
   id: z.string().or(z.number()),
   subject: z.string(),
   sender: z.string(),
+  prediction: z.string().optional(),
+  receivedAt: z.string().optional(),
+});
+
+const EmailListSchema = z.object({
+  emails: z.array(EmailSchema),
+  total: z.number().optional(),
+  page: z.number().optional(),
+});
+
+const StatsSchema = z.object({
+  total: z.number(),
+  phishing: z.number(),
+  safe: z.number(),
+  pending: z.number(),
 });
 
 function validate(schema, data) {

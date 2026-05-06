@@ -1,0 +1,108 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+      - name: Run unit tests
+        working-directory: ./backend
+        run: npm test -- --testPathPattern=unit
+      - name: Run integration tests
+        working-directory: ./backend
+        run: npm test -- --testPathPattern=integration
+      - name: Generate coverage
+        working-directory: ./backend
+        run: npm run test:coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage/coverage-final.json
+          flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      - name: Run component tests
+        working-directory: ./frontend
+        run: npm run test
+      - name: Generate coverage
+        working-directory: ./frontend
+        run: npm run test:coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  test-ml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: ./ml-service
+        run: |
+          pip install -r requirements.txt
+          pip install pytest-cov httpx
+      - name: Run unit tests
+        working-directory: ./ml-service
+        run: pytest -m unit -v
+      - name: Run integration tests
+        working-directory: ./ml-service
+        run: pytest -m integration -v
+      - name: Generate coverage
+        working-directory: ./ml-service
+        run: pytest --cov=. --cov-report=xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./ml-service/coverage.xml
+          flags: ml-service
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  test-summary:
+    needs: [test-backend, test-frontend, test-ml]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test-backend.result }}" == "failure" ] || \
+             [ "${{ needs.test-frontend.result }}" == "failure" ] || \
+             [ "${{ needs.test-ml.result }}" == "failure" ]; then
+            echo "❌ Some tests failed"
+            exit 1
+          else
+            echo "✅ All tests passed"
+          fi
