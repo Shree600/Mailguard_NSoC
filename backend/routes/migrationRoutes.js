@@ -18,4 +18,7 @@ router.post('/update-emails', bulkOperationLimiter, migrationController.migrateE
 // GET /api/migration/status - Get migration status
 router.get('/status', migrationController.getMigrationStatus);
 
+// POST /api/migration/rollback - Rollback a specific migration
+router.post('/rollback', migrationController.rollbackMigration);
+
 module.exports = router;

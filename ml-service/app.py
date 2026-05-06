@@ -146,29 +146,83 @@ def _validate_total_bytes(total_bytes: int) -> None:
         raise HTTPException(status_code=413, detail="Payload exceeds total size limit")
 
 
-# Health check endpoint
+# Health check endpoint with model integrity validation
 @app.get("/health")
 async def health_check():
     """
-    Health check endpoint to verify service is running and model is loaded.
+    Enhanced health check endpoint with model integrity validation.
+    Verifies model/vectorizer are loaded and functional.
     Used by Docker health checks and load balancers.
-    Returns: Status message with model status
-    Raises: HTTPException 503 if model is not loaded
+    Returns: Status message with model status and integrity details
+    Raises: HTTPException 503 if model is not loaded or integrity check fails
     """
-    model_status = predictor.get_model_status()
-    
-    # Critical: Service is only healthy if model is loaded
-    if not model_status["loaded"]:
+    try:
+        # Perform comprehensive integrity check
+        is_healthy, integrity_result = predictor.check_model_integrity()
+        
+        # Prepare response
+        response = {
+            "status": "ok" if is_healthy else "degraded",
+            "service": "phishing-detection-ml-service",
+            "version": "1.0.0",
+            "model_loaded": integrity_result["model_loaded"],
+            "vectorizer_loaded": integrity_result["vectorizer_loaded"],
+            "smoke_test_passed": integrity_result["smoke_test_passed"],
+            "model_details": integrity_result.get("details", {})
+        }
+        
+        # Add warnings if any
+        if integrity_result.get("warnings"):
+            response["warnings"] = integrity_result["warnings"]
+        
+        # Add errors if any
+        if integrity_result.get("errors"):
+            response["errors"] = integrity_result["errors"]
+        
+        # Critical: Service is only healthy if model passes integrity check
+        if not is_healthy:
+            raise HTTPException(
+                status_code=503,
+                detail="Service degraded: Model integrity check failed. " + "; ".join(integrity_result.get("errors", ["Unknown error"]))
+            )
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Health check error: {str(e)}")
         raise HTTPException(
             status_code=503,
-            detail="Service unavailable: Model not loaded"
+            detail=f"Health check failed: {str(e)}"
         )
-    
-    return {
-        "status": "ok",
-        "model_loaded": True,
-        "model_version": model_status.get("version", "unknown")
-    }
+
+
+# Detailed model integrity check endpoint
+@app.get("/model/integrity")
+async def model_integrity():
+    """
+    Detailed model integrity check endpoint.
+    Returns comprehensive status about model health without affecting service status.
+    Useful for debugging and monitoring.
+    """
+    try:
+        is_healthy, integrity_result = predictor.check_model_integrity()
+        
+        return {
+            "healthy": is_healthy,
+            "model_loaded": integrity_result["model_loaded"],
+            "vectorizer_loaded": integrity_result["vectorizer_loaded"],
+            "smoke_test_passed": integrity_result["smoke_test_passed"],
+            "errors": integrity_result["errors"],
+            "warnings": integrity_result["warnings"],
+            "details": integrity_result.get("details", {})
+        }
+    except Exception as e:
+        return {
+            "healthy": False,
+            "error": str(e)
+        }
 
 
 # Root endpoint
@@ -338,6 +392,7 @@ async def get_model_status():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status error: {str(e)}")
+
 
 # NEW: Cache statistics endpoint
 @app.get("/cache/stats")

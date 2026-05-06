@@ -215,3 +215,98 @@ module.exports = {
   checkHealth,
   getServiceInfo
 };
+
+// backend/services/mlService.js
+
+const MAX_RETRIES = 3;
+const INITIAL_DELAY_MS = 500;
+const CIRCUIT_BREAKER_THRESHOLD = 5;  // failures before opening circuit
+const CIRCUIT_RESET_TIMEOUT_MS = 30000; // 30 seconds
+
+// Circuit breaker state
+let failureCount = 0;
+let circuitOpen = false;
+let circuitOpenedAt = null;
+
+// Metrics
+const metrics = {
+  totalRetries: 0,
+  circuitBreakerTrips: 0,
+  successAfterRetry: 0,
+};
+
+// Exponential backoff helper
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Check and manage circuit breaker
+function checkCircuitBreaker() {
+  if (circuitOpen) {
+    const elapsed = Date.now() - circuitOpenedAt;
+    if (elapsed > CIRCUIT_RESET_TIMEOUT_MS) {
+      console.log('[CircuitBreaker] Resetting circuit after timeout');
+      circuitOpen = false;
+      failureCount = 0;
+    } else {
+      throw new Error('Circuit breaker is OPEN. ML service unavailable.');
+    }
+  }
+}
+
+function recordFailure() {
+  failureCount++;
+  if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
+    circuitOpen = true;
+    circuitOpenedAt = Date.now();
+    metrics.circuitBreakerTrips++;
+    console.error(`[CircuitBreaker] Circuit OPENED after ${failureCount} failures`);
+  }
+}
+
+function recordSuccess() {
+  failureCount = 0;
+  circuitOpen = false;
+}
+
+// Main ML call with retry + circuit breaker
+async function callMLWithRetry(mlFn, ...args) {
+  checkCircuitBreaker();
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const result = await mlFn(...args);
+
+      if (attempt > 1) {
+        metrics.successAfterRetry++;
+        console.log(`[Retry] Succeeded on attempt ${attempt}`);
+      }
+
+      recordSuccess();
+      return result;
+
+    } catch (err) {
+      const isLastAttempt = attempt === MAX_RETRIES;
+
+      if (isLastAttempt) {
+        recordFailure();
+        console.error(`[Retry] All ${MAX_RETRIES} attempts failed. Error: ${err.message}`);
+        console.log('[Metrics]', metrics);
+        throw err;
+      }
+
+      // Exponential backoff: 500ms, 1000ms, 2000ms...
+      const delay = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+      metrics.totalRetries++;
+      console.warn(`[Retry] Attempt ${attempt} failed. Retrying in ${delay}ms...`);
+      await sleep(delay);
+    }
+  }
+}
+
+// Export wrapper around your existing classify function
+async function classifyEmail(emailData) {
+  return callMLWithRetry(originalMLClassifyFn, emailData);
+}
+
+module.exports = { classifyEmail, metrics };
